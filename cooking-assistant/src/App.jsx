@@ -1,80 +1,98 @@
-// src/App.jsx - Complete corrected code
-import React, { useState, useMemo } from "react";
-import Fuse from 'fuse.js';
-import 'regenerator-runtime/runtime';
+import React, { useState, useEffect, useMemo } from "react";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom"; // ← Link add kiya
+import Fuse from "fuse.js";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import RecipeCard from "./components/RecipeCard";
 import VoiceModal from "./components/VoiceModal";
+import RecipeDetails from "./components/RecipeDetails";
+import AllFreeRecipes from "./components/AllFreeRecipes";
+import AllPremiumRecipes from "./components/AllPremiumRecipes";
 
-// ✅ Move constants OUTSIDE component or at the TOP of component
-const FREE_RECIPES = [
-  { 
-    id: 1,
-    title: "Savory Herb-Crusted Salmon", 
-    desc: "A healthy and flavorful salmon dish with fresh herbs and crispy coating. Perfect for dinner.", 
-    img: "https://images.unsplash.com/photo-1516685018646-5499d0a6dbdf?w=400", 
-    tag: "FREE" 
-  },
-  { 
-    id: 2,
-    title: "Spicy Thai Peanut Noodles", 
-    desc: "A quick and easy noodle recipe with authentic Thai flavors and creamy peanut sauce.", 
-    img: "https://images.unsplash.com/photo-1464306076886-deb9eb240a65?w=400", 
-    tag: "FREE" 
-  },
-];
+const API_BASE_URL = "http://127.0.0.1:5000";
 
-const PREMIUM_RECIPES = [
-  { 
-    id: 3,
-    title: "Mediterranean Quinoa Salad", 
-    desc: "A refreshing and nutritious salad packed with Mediterranean vegetables and quinoa.", 
-    img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400", 
-    tag: "PREMIUM" 
-  },
-  { 
-    id: 4,
-    title: "Creamy Avocado Pasta", 
-    desc: "A rich and creamy pasta dish made with fresh avocados and aromatic herbs.", 
-    img: "https://images.unsplash.com/photo-1523983303491-8c8f7dd0b13e?w=400", 
-    tag: "PREMIUM" 
-  },
-];
+// Loading Component
+function AppLoadingSpinner() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600 font-medium">Loading delicious recipes...</p>
+      </div>
+    </div>
+  );
+}
 
-function App() {
+// Error Component
+function AppErrorMessage({ message, onRetry }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-red-400 mb-4 text-4xl">⚠️</div>
+        <h3 className="text-xl font-semibold text-gray-600 mb-2">Oops! Something went wrong</h3>
+        <p className="text-gray-500 mb-4">{message}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full font-semibold transition-colors"
+          >
+            Try Again
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Homepage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [recipes, setRecipes] = useState({ free: [], premium: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // ✅ Now useMemo can access the constants
-  const allRecipes = useMemo(() => {
-    return [...FREE_RECIPES, ...PREMIUM_RECIPES];
+  const fetchRecipes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${API_BASE_URL}/recipes`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+      setRecipes(data);
+    } catch (err) {
+      setError("Failed to load recipes. Please make sure the Flask server is running.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecipes();
   }, []);
 
-  // Fuse.js configuration for fuzzy search
+  const allRecipes = useMemo(() => [...recipes.free, ...recipes.premium], [recipes]);
+
   const fuseOptions = {
     keys: [
-      { name: 'title', weight: 0.7 },
-      { name: 'desc', weight: 0.3 }
+      { name: "title", weight: 0.7 },
+      { name: "desc", weight: 0.3 },
     ],
-    threshold: 0.4,           // 0.0 = perfect match, 1.0 = match anything
+    threshold: 0.4,
     distance: 100,
     minMatchCharLength: 2,
     includeScore: true,
     ignoreLocation: true,
-    findAllMatches: true
+    findAllMatches: true,
   };
 
   const fuse = useMemo(() => new Fuse(allRecipes, fuseOptions), [allRecipes]);
 
-  // Enhanced fuzzy search with Fuse.js
   const filteredRecipes = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return null;
-    }
-    
+    if (!searchQuery.trim()) return null;
     const results = fuse.search(searchQuery.trim());
-    return results.map(result => result.item);
+    return results.map((result) => result.item);
   }, [searchQuery, fuse]);
 
   const handleVoiceResult = (voiceText) => {
@@ -88,26 +106,17 @@ function App() {
 
   const renderSearchResults = () => {
     if (filteredRecipes === null) return null;
-    
-    if (filteredRecipes.length === 0) {
+    if (filteredRecipes.length === 0)
       return (
         <div className="text-center py-16">
-          <div className="text-gray-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.007-5.824-2.448M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
+          <div className="text-gray-400 mb-4 text-6xl">🔍</div>
           <h3 className="text-xl font-semibold text-gray-600 mb-2">No recipes found</h3>
           <p className="text-gray-500">Try different keywords or use voice search.</p>
         </div>
       );
-    }
-
     return (
       <section className="mb-12">
-        <h2 className="font-bold text-2xl mb-6">
-          Search Results ({filteredRecipes.length} found)
-        </h2>
+        <h2 className="font-bold text-2xl mb-6 text-gray-800">Search Results ({filteredRecipes.length} found)</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRecipes.map((recipe) => (
             <RecipeCard key={recipe.id} {...recipe} />
@@ -119,22 +128,45 @@ function App() {
 
   const renderDefaultSections = () => {
     if (filteredRecipes !== null) return null;
-    
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-12">
         <section>
-          <h2 className="font-bold text-2xl mb-6">Free Recipes</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-bold text-2xl text-gray-800 flex items-center gap-2">
+              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">FREE</span> 
+              Recipes ({recipes.free.length})
+            </h2>
+            <Link 
+              to="/free-recipes" 
+              className="text-green-600 hover:text-green-700 font-medium text-sm flex items-center gap-1 hover:underline"
+            >
+              View All
+              <span className="text-lg">→</span>
+            </Link>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {FREE_RECIPES.map((recipe) => (
+            {recipes.free.slice(0, 2).map((recipe) => (
               <RecipeCard key={recipe.id} {...recipe} />
             ))}
           </div>
         </section>
         
         <section>
-          <h2 className="font-bold text-2xl mb-6">Premium Recipes</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-bold text-2xl text-gray-800 flex items-center gap-2">
+              <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-semibold">PREMIUM</span> 
+              Recipes ({recipes.premium.length})
+            </h2>
+            <Link 
+              to="/premium-recipes" 
+              className="text-orange-600 hover:text-orange-700 font-medium text-sm flex items-center gap-1 hover:underline"
+            >
+              View All
+              <span className="text-lg">→</span>
+            </Link>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {PREMIUM_RECIPES.map((recipe) => (
+            {recipes.premium.slice(0, 2).map((recipe) => (
               <RecipeCard key={recipe.id} {...recipe} />
             ))}
           </div>
@@ -143,19 +175,18 @@ function App() {
     );
   };
 
+  if (loading) return <AppLoadingSpinner />;
+  if (error) return <AppErrorMessage message={error} onRetry={fetchRecipes} />;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar 
-        searchQuery={searchQuery} 
-        setSearchQuery={setSearchQuery}
-        onVoiceSearch={handleVoiceSearch}
-      />
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} onVoiceSearch={handleVoiceSearch} />
       <Hero />
-      
+
       <main className="max-w-7xl mx-auto px-4 py-10">
         {renderSearchResults()}
         {renderDefaultSections()}
-        
+
         <div className="text-center py-12 bg-white rounded-lg shadow-md">
           <h2 className="font-bold text-2xl mb-3">Upload Your Recipe</h2>
           <p className="text-gray-600 mb-6 max-w-md mx-auto">
@@ -166,7 +197,7 @@ function App() {
           </button>
         </div>
       </main>
-      
+
       <footer className="bg-white text-gray-500 text-sm text-center py-8 border-t mt-16">
         <div className="flex flex-col md:flex-row gap-4 justify-center mb-4">
           <a href="#" className="hover:text-gray-700 transition-colors">About</a>
@@ -177,12 +208,21 @@ function App() {
         <span>©2024 CookBuddy. All rights reserved.</span>
       </footer>
 
-      <VoiceModal
-        isOpen={isVoiceModalOpen}
-        onClose={() => setIsVoiceModalOpen(false)}
-        onVoiceResult={handleVoiceResult}
-      />
+      <VoiceModal isOpen={isVoiceModalOpen} onClose={() => setIsVoiceModalOpen(false)} onVoiceResult={handleVoiceResult} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/recipe/:id" element={<RecipeDetails />} />
+        <Route path="/free-recipes" element={<AllFreeRecipes />} />
+        <Route path="/premium-recipes" element={<AllPremiumRecipes />} />
+      </Routes>
+    </Router>
   );
 }
 
