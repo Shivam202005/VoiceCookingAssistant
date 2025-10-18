@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+CORS(app) 
 
 RECIPE_DATA = {
     "free": [

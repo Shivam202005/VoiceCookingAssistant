@@ -345,7 +345,7 @@ export default function VoiceModal({ isOpen, onClose }) {
       console.log("❌ No recipes found for:", query);
       setWaitingForConfirmation(false);
       waitingForConfirmationRef.current = false;
-      await speak("Sorry, no recipes found. Try saying chicken, pasta, pizza, or another dish name.");
+      await speak("Sorry, no recipes found. Try saying soup, pasta, pizza, or another dish name.");
     }
   };
 
