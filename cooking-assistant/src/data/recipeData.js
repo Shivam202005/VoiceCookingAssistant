@@ -58,7 +58,7 @@ export const FREE_RECIPES = [
         "Crumble feta cheese and roughly chop Kalamata olives.",
         "In a large bowl, combine cooled quinoa with all vegetables and cheese.",
         "Whisk together olive oil, lemon juice, oregano, salt, and pepper for dressing.",
-        "Pour dressing over salad and toss gently. Chill for 30 minutes before serving."
+        "Pour dressing overr salad and toss gently. Chill for 30 minutes before serving."
       ]
     },
     { 
