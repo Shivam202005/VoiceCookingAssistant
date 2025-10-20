@@ -197,7 +197,7 @@ export default function RecipeDetails() {
         }
         
         if (isReadingRef.current) {
-          await speak("Perfect! Your recipe is complete. Enjoy your delicious meal!");
+          await speak("Perfect! Your recipe is complete. Enjoy your delicious meal! Have a good day");
         }
       }
       
