@@ -173,9 +173,7 @@ function Homepage() {
             <p className="text-lg opacity-90">
               Now serving <span className="font-bold text-yellow-200">{stats.total_recipes}</span> professional recipes
             </p>
-            <p className="text-sm opacity-75 mt-1">
-              Status: {stats.status === 'database' ? 'Real recipes from Spoonacular' : 'Fallback mode'}
-            </p>
+           
           </div>
         )}
 
