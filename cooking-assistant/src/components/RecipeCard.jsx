@@ -1,4 +1,3 @@
-// src/components/RecipeCard.jsx - Simple working version
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -58,7 +57,6 @@ export default function RecipeCard({ id, title, desc, img, tag, cookTime, servin
             {cleanDesc}
           </p>
 
-          {/* Recipe Meta Info */}
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center gap-1">
               <span className="text-orange-500">⏰</span>
@@ -71,7 +69,6 @@ export default function RecipeCard({ id, title, desc, img, tag, cookTime, servin
             </div>
           </div>
 
-          {/* Hover Arrow */}
           <div className="mt-4 flex items-center text-orange-600 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity">
             <span>View Recipe</span>
             <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
