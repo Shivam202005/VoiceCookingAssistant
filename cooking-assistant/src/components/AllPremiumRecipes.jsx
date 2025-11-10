@@ -48,7 +48,7 @@ export default function AllPremiumRecipes() {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <div className="text-red-400 mb-4 text-4xl">⚠️</div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">Failed to load recipes</h3>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">Failed to load Recipes</h3>
             <p className="text-gray-500 mb-4">{error}</p>
             <Link to="/" className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full font-semibold transition-colors">
               Back to Home
