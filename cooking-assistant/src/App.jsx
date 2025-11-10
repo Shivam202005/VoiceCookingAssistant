@@ -290,7 +290,7 @@ function Homepage() {
             <a href="#" className="hover:text-gray-700 transition-colors">Privacy Policy</a>
           </div>
           <div className="border-t border-gray-200 pt-8">
-            <p className="mb-2">©2025 CookBuddy. All rights reserved.</p>
+            <p className="mb-2">©2025 CookBuddy. All Rights reserved.</p>
             {stats && (
               <p className="text-xs text-gray-400">
                 Powered by {stats.total_recipes} professional recipes • Database status: {stats.status}
