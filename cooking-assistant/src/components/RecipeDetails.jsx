@@ -238,7 +238,7 @@ export default function RecipeDetails() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8">
-          <h3 className="text-2xl font-semibold text-gray-600 mb-2">Recipe Not Found</h3>
+          <h3 className="text-2xl font-semibold text-gray-600 mb-2">Recipe Not Found, Sorry !</h3>
           <Link to="/" className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full">
             🏠 Back to Home
           </Link>
