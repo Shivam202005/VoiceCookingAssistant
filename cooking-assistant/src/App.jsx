@@ -293,7 +293,7 @@ function Homepage() {
             <p className="mb-2">©2025 CookBuddy. All Rights reserved.</p>
             {stats && (
               <p className="text-xs text-gray-400">
-                Powered by {stats.total_recipes} Professional recipes • Database status: {stats.status}
+                Powered by {stats.total_recipes} Professional recipes • Database Status: {stats.status}
               </p>
             )}
           </div>
