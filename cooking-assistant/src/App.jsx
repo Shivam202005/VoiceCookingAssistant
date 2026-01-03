@@ -1,4 +1,4 @@
-// src/App.jsx - Enhanced for large recipe database
+// src/App.jsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useMemo } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Fuse from "fuse.js";
@@ -9,9 +9,11 @@ import VoiceModal from "./components/VoiceModal";
 import RecipeDetails from "./components/RecipeDetails";
 import AllFreeRecipes from "./components/AllFreeRecipes";
 import AllPremiumRecipes from "./components/AllPremiumRecipes";
+import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthForm from './components/AuthForm';
 
 const API_BASE_URL = "http://127.0.0.1:5000"; 
-// Enhanced Loading Component
+
 function AppLoadingSpinner() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -24,7 +26,6 @@ function AppLoadingSpinner() {
   );
 }
 
-// Enhanced Error Component
 function AppErrorMessage({ message, onRetry }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -46,6 +47,8 @@ function AppErrorMessage({ message, onRetry }) {
 }
 
 function Homepage() {
+  const { user, logout } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [recipes, setRecipes] = useState({ free: [], premium: [] });
@@ -58,19 +61,20 @@ function Homepage() {
       setLoading(true);
       setError(null);
 
-      // Fetch recipes
       const response = await fetch(`${API_BASE_URL}/recipes`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      setRecipes(data);
+      
+      // FIX: Backend bhejta hai flat array, hum separate karte hain
+      const freeRecipes = data.filter(r => r.tag === 'FREE');
+      const premiumRecipes = data.filter(r => r.tag === 'PREMIUM');
+      setRecipes({ free: freeRecipes, premium: premiumRecipes });
 
-      // Fetch stats for display
       const statsResponse = await fetch(`${API_BASE_URL}/stats`);
       if (statsResponse.ok) {
         const statsData = await statsResponse.json();
         setStats(statsData);
       }
-
     } catch (err) {
       setError("Failed to load recipes. Please make sure the Flask server is running on port 5000.");
     } finally {
@@ -134,9 +138,7 @@ function Homepage() {
       <section className="mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="font-bold text-3xl mb-2 text-gray-800">
-              Search Results
-            </h2>
+            <h2 className="font-bold text-3xl mb-2 text-gray-800">Search Results</h2>
             <p className="text-gray-600">
               Found <span className="font-semibold text-orange-600">{filteredRecipes.length}</span> recipes matching "{searchQuery}"
             </p>
@@ -166,18 +168,15 @@ function Homepage() {
     if (filteredRecipes !== null) return null;
     return (
       <>
-        {/* Stats Display */}
         {stats && (
           <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 rounded-xl mb-12 text-center">
             <h2 className="text-2xl font-bold mb-2">🍽️ Recipe Database Loaded!</h2>
             <p className="text-lg opacity-90">
               Now serving <span className="font-bold text-yellow-200">{stats.total_recipes}</span> professional recipes
             </p>
-           
           </div>
         )}
 
-        {/* Recipe Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-12">
           <section>
             <div className="flex items-center justify-between mb-8">
@@ -271,12 +270,20 @@ function Homepage() {
           <div className="max-w-2xl mx-auto">
             <h2 className="font-bold text-3xl mb-4 text-gray-800">Share Your Recipe</h2>
             <p className="text-gray-600 mb-8 text-lg leading-relaxed">
-              Join our community of food lovers and share your culinary creations with the world.
-              Your recipe could inspire thousands of home cooks!
+              Join our community of food lovers and share your culinary creations with the world!
             </p>
-            <button className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-10 py-4 rounded-full font-bold text-lg transition-all duration-200 shadow-lg hover:shadow-xl">
-              Sign Up to Share Your Recipe
-            </button>
+            {user ? (
+              <button className="bg-green-500 hover:bg-green-600 text-white px-10 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl transition-all">
+                Share Your Own Recipe (Coming Soon)
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-10 py-4 rounded-full font-bold text-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Sign Up to Share Your Recipe
+              </button>
+            )}
           </div>
         </div>
       </main>
@@ -300,10 +307,12 @@ function Homepage() {
         </div>
       </footer>
 
+      {showAuth && <AuthForm onClose={() => setShowAuth(false)} />}
+
       <VoiceModal
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
-        onVoiceResult={() => { }} // Empty function since modal handles search internally
+        onVoiceResult={handleVoiceResult}
       />
     </div>
   );
@@ -311,14 +320,16 @@ function Homepage() {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Homepage />} />
-        <Route path="/recipe/:id" element={<RecipeDetails />} />
-        <Route path="/free-recipes" element={<AllFreeRecipes />} />
-        <Route path="/premium-recipes" element={<AllPremiumRecipes />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Homepage />} />
+          <Route path="/recipe/:id" element={<RecipeDetails />} />
+          <Route path="/free-recipes" element={<AllFreeRecipes />} />
+          <Route path="/premium-recipes" element={<AllPremiumRecipes />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

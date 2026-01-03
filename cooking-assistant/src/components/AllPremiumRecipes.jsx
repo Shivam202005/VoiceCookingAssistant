@@ -1,3 +1,4 @@
+// src/components/AllPremiumRecipes.jsx - COMPLETE FIXED
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import RecipeCard from "./RecipeCard";
@@ -18,7 +19,10 @@ export default function AllPremiumRecipes() {
         const response = await fetch(`${API_BASE_URL}/recipes`);
         if (!response.ok) throw new Error(`Status: ${response.status}`);
         const data = await response.json();
-        setRecipes(data.premium || []);
+        
+        // FIXED: Backend flat array bhejta hai, filter kar PREMIUM recipes
+        const premiumRecipes = data.filter(r => r.tag === 'PREMIUM');
+        setRecipes(premiumRecipes);
       } catch (error) {
         setError(error.message);
       } finally {

@@ -1,23 +1,53 @@
-# app.py - Database integrated version
+# app.py - COMPLETE FIXED VERSION WITH AUTH
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from models import db, Recipe
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from flask_bcrypt import Bcrypt
+from flask_migrate import Migrate
+from models import db, User, Recipe
 import os
 from dotenv import load_dotenv
+
 
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
 
-# Database configuration
+# CREATE APP FIRST
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///recipes.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
 
-# Fallback data (your original recipes)
+# INITIALIZE EXTENSIONS
+db.init_app(app)
+migrate = Migrate(app, db)
+
+# ✅ FIXED CORS CONFIGURATION
+CORS(app, 
+     resources={r"/*": {
+         "origins": ["http://localhost:5173", "http://localhost:3000"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "supports_credentials": True
+     }})
+     
+bcrypt = Bcrypt(app)
+
+
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+# Fallback data
 FALLBACK_DATA = {
     "free": [
         {
@@ -80,31 +110,28 @@ FALLBACK_DATA = {
     ]
 }
 
+
+# ROUTES
 @app.route("/recipes")
 def get_recipes():
-    """Load from database first, fallback to hardcoded data"""
+    """Load recipes - return flat array with tag"""
     try:
-        free_recipes = Recipe.query.filter_by(category='FREE').all()
-        premium_recipes = Recipe.query.filter_by(category='PREMIUM').all()
-        
-        if free_recipes or premium_recipes:
-            return jsonify({
-                'free': [recipe.to_dict() for recipe in free_recipes],
-                'premium': [recipe.to_dict() for recipe in premium_recipes]
-            })
+        all_recipes = Recipe.query.all()
+        if all_recipes:
+            return jsonify([recipe.to_dict() for recipe in all_recipes])
         else:
-            print("📝 Database empty - using fallback data")
-            return jsonify(FALLBACK_DATA)
-            
+            # Fallback if no DB data
+            return jsonify(FALLBACK_DATA["free"] + FALLBACK_DATA["premium"])
     except Exception as e:
         print(f"Database error: {e}")
-        return jsonify(FALLBACK_DATA)
+        return jsonify(FALLBACK_DATA["free"] + FALLBACK_DATA["premium"])
+
 
 @app.route("/recipe/<int:recipe_id>")
 def get_recipe(recipe_id):
     """Get single recipe"""
     try:
-        recipe = Recipe.query.get(recipe_id)
+        recipe = db.session.get(Recipe, recipe_id)
         if recipe:
             return jsonify(recipe.to_dict())
     except Exception as e:
@@ -114,6 +141,7 @@ def get_recipe(recipe_id):
     all_fallback = FALLBACK_DATA["free"] + FALLBACK_DATA["premium"]
     recipe = next((r for r in all_fallback if r["id"] == recipe_id), None)
     return jsonify(recipe) if recipe else ({"error": "Recipe not found"}, 404)
+
 
 @app.route('/search')
 def search_recipes():
@@ -130,6 +158,7 @@ def search_recipes():
         all_fallback = FALLBACK_DATA["free"] + FALLBACK_DATA["premium"]
         filtered = [r for r in all_fallback if query.lower() in r['title'].lower()]
         return jsonify(filtered)
+
 
 @app.route('/stats')
 def get_stats():
@@ -148,7 +177,120 @@ def get_stats():
             'error': str(e)
         })
 
-# Create database tables when app starts
+
+# ✅ AUTH ROUTES WITH PROPER ERROR HANDLING
+@app.route('/signup', methods=['POST', 'OPTIONS'])
+def signup():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.json
+        
+        # Validation
+        if not data or not data.get('name') or not data.get('email') or not data.get('password'):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Check existing user
+        if User.query.filter_by(email=data['email']).first():
+            return jsonify({'error': 'Email already exists'}), 400
+        
+        # Create user
+        user = User(name=data['name'], email=data['email'])
+        user.set_password(data['password'])
+        db.session.add(user)
+        db.session.commit()
+        
+        print(f"✅ User created: {user.name} ({user.email})")
+        return jsonify({'user_id': user.id, 'name': user.name}), 201
+        
+    except Exception as e:
+        print(f"❌ Signup error: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Signup failed', 'details': str(e)}), 500
+
+
+@app.route('/login', methods=['POST', 'OPTIONS'])
+def login():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.json
+        
+        if not data or not data.get('email') or not data.get('password'):
+            return jsonify({'error': 'Missing email or password'}), 400
+        
+        user = User.query.filter_by(email=data['email']).first()
+        
+        if user and user.check_password(data['password']):
+            login_user(user)
+            print(f"✅ User logged in: {user.name}")
+            return jsonify({'user_id': user.id, 'name': user.name}), 200
+        
+        return jsonify({'error': 'Invalid credentials'}), 401
+        
+    except Exception as e:
+        print(f"❌ Login error: {e}")
+        return jsonify({'error': 'Login failed', 'details': str(e)}), 500
+
+
+@app.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@app.route('/profile/<int:user_id>')
+def profile(user_id):
+    """Public profile view"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'name': user.name,
+            'email': user.email,
+            'recipes': [{'id': r.id, 'title': r.title, 'is_paid': r.is_paid} for r in user.recipes]
+        })
+    except Exception as e:
+        print(f"❌ Profile error: {e}")
+        return jsonify({'error': 'Failed to load profile'}), 500
+
+
+@app.route('/recipes/upload', methods=['POST', 'OPTIONS'])
+@login_required
+def upload_recipe():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.json
+        recipe = Recipe(
+            title=data['title'],
+            description=data.get('description', ''),
+            ingredients=data['ingredients'],
+            steps=data['steps'],
+            image_url=data.get('image_url', '/images/f1.jpeg'),
+            author_id=current_user.id,
+            is_paid=data.get('is_paid', False),
+            category='PREMIUM' if data.get('is_paid', False) else 'FREE'
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        
+        print(f"✅ Recipe uploaded: {recipe.title} by {current_user.name}")
+        return jsonify({'recipe_id': recipe.id, 'message': 'Recipe uploaded successfully'}), 201
+        
+    except Exception as e:
+        print(f"❌ Upload error: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Upload failed', 'details': str(e)}), 500
+
+
+# Create database tables
 with app.app_context():
     try:
         db.create_all()
@@ -156,7 +298,9 @@ with app.app_context():
     except Exception as e:
         print(f"❌ Database creation error: {e}")
 
+
 if __name__ == '__main__':
     print("🚀 Starting Flask Recipe API Server...")
     print("📊 Will use database if populated, fallback to hardcoded data otherwise")
+    print("🔐 Auth endpoints: /signup, /login, /logout")
     app.run(debug=True, host='127.0.0.1', port=5000)
