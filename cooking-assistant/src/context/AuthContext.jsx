@@ -9,24 +9,41 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userId = localStorage.getItem('user_id');
-    if (userId) {
-      fetch(`http://localhost:5000/profile/${userId}`)
-        .then(res => res.json())
-        .then(data => setUser(data))
-        .catch(() => localStorage.removeItem('user_id'));
-    }
-    setLoading(false);
+    // Check if user is logged in (from LocalStorage)
+    const checkUser = async () => {
+        const storedUserId = localStorage.getItem('user_id');
+        
+        if (storedUserId) {
+            try {
+                const res = await fetch(`http://localhost:5000/profile/${storedUserId}`);
+                if (res.ok) {
+                    const userData = await res.json();
+                    setUser(userData);
+                } else {
+                    // Agar user DB me nahi mila to logout kar do
+                    localStorage.removeItem('user_id');
+                }
+            } catch (error) {
+                console.log("Error restoring session:", error);
+            }
+        }
+        setLoading(false);
+    };
+
+    checkUser();
   }, []);
 
   const login = (userData) => {
     setUser(userData);
+    // User ID save karo taaki refresh hone par logout na ho
     localStorage.setItem('user_id', userData.user_id);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user_id');
+    // Optional: Backend logout call bhi kar sakte ho
+    fetch('http://localhost:5000/logout', { method: 'POST' });
   };
 
   return (
