@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "/api";
 
 export default function VoiceModal({ isOpen, onClose }) {
   const [isListening, setIsListening] = useState(false);

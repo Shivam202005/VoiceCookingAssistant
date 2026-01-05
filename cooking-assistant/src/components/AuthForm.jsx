@@ -17,7 +17,7 @@ const AuthForm = ({ onClose }) => {
     
     try {
       // ✅ 127.0.0.1 use kar rahe hain consistent rehne ke liye
-      const res = await fetch(`http://127.0.0.1:5000${endpoint}`, {
+      const res = await fetch(`/api${endpoint}`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json' 

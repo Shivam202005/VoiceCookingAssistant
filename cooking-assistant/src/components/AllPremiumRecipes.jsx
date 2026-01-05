@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import RecipeCard from "./RecipeCard";
 import Navbar from "./Navbar";
 
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "/api";
 
 export default function AllPremiumRecipes() {
   const [recipes, setRecipes] = useState([]);

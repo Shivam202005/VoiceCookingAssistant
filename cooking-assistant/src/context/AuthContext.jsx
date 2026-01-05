@@ -9,22 +9,27 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in (from LocalStorage)
     const checkUser = async () => {
         const storedUserId = localStorage.getItem('user_id');
         
-        if (storedUserId) {
+        // "undefined" string check karna zaroori hai kyunki localStorage kabhi kabhi string save kar leta hai
+        if (storedUserId && storedUserId !== 'undefined' && storedUserId !== 'null') {
             try {
-                const res = await fetch(`http://localhost:5000/profile/${storedUserId}`);
+                // 🔥 URL sirf 127.0.0.1 hona chahiye
+                const res = await fetch(`/api/profile/${storedUserId}`, {
+                    credentials: 'include' 
+                });
+                
                 if (res.ok) {
                     const userData = await res.json();
                     setUser(userData);
                 } else {
-                    // Agar user DB me nahi mila to logout kar do
+                    // Agar session invalid hai to safai karo
                     localStorage.removeItem('user_id');
+                    setUser(null);
                 }
             } catch (error) {
-                console.log("Error restoring session:", error);
+                console.log("Session restore failed:", error);
             }
         }
         setLoading(false);
@@ -35,15 +40,16 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => {
     setUser(userData);
-    // User ID save karo taaki refresh hone par logout na ho
-    localStorage.setItem('user_id', userData.user_id);
+    localStorage.setItem('user_id', userData.user_id || userData.id);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user_id');
-    // Optional: Backend logout call bhi kar sakte ho
-    fetch('http://localhost:5000/logout', { method: 'POST' });
+    fetch('/api/logout', { 
+        method: 'POST',
+        credentials: 'include'
+    });
   };
 
   return (

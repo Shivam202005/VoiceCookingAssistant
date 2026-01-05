@@ -11,7 +11,6 @@ export default function ShareRecipeModal({ onClose, onUploadSuccess }) {
     image_url: ''
   });
 
-  // Ingredients aur Steps ko dynamic array banayenge
   const [ingredients, setIngredients] = useState(['']);
   const [steps, setSteps] = useState(['']);
   const [loading, setLoading] = useState(false);
@@ -37,31 +36,32 @@ export default function ShareRecipeModal({ onClose, onUploadSuccess }) {
 
     const recipeData = {
       ...formData,
-      ingredients: ingredients.filter(i => i.trim() !== ''), // Empty lines hata do
+      ingredients: ingredients.filter(i => i.trim() !== ''),
       steps: steps.filter(s => s.trim() !== '')
     };
 
     try {
-     // fetch function ke andar ye change karo:
-const response = await fetch('http://127.0.0.1:5000/recipes/upload', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(recipeData),
-    credentials: 'include' // 🔥 YE LINE SABSE IMPORTANT HAI
-});
+      // 👇 CHANGE IS HERE: URL aur credentials
+      const response = await fetch('/api/recipes/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(recipeData),
+        credentials: 'include' // 🔥 YE LINE SABSE ZAROORI HAI (Iske bina upload nahi hoga)
+      });
 
       if (response.ok) {
         alert('Recipe Uploaded Successfully! 🎉');
-        onUploadSuccess(); // App ko batao refresh karne ke liye
+        onUploadSuccess(); // List refresh karega
         onClose();
       } else {
-        alert('Failed to upload. Please try again.');
+        const data = await response.json();
+        alert('Failed to upload: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Server error.');
+      alert('Server error. Is backend running?');
     } finally {
       setLoading(false);
     }

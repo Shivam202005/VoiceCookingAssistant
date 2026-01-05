@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "/api";
 
 export default function RecipeDetails() {
   const { id } = useParams();

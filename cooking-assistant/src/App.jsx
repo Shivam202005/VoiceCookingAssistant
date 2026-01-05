@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthForm from './components/AuthForm';
 import ShareRecipeModal from './components/ShareRecipeModal';
 
-const API_BASE_URL = "http://127.0.0.1:5000"; 
+const API_BASE_URL = "/api"; 
 
 function AppLoadingSpinner() { return <div className="p-10 text-center">Loading...</div> }
 function AppErrorMessage({message}) { return <div className="p-10 text-red-500">{message}</div> }
