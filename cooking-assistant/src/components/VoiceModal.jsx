@@ -1,4 +1,3 @@
-// VoiceModal.jsx - Enhanced Voice Recognition
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -57,14 +56,13 @@ export default function VoiceModal({ isOpen, onClose }) {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
       recognitionRef.current.lang = "en-US";
-      recognitionRef.current.maxAlternatives = 5; // More alternatives for better matching
+      recognitionRef.current.maxAlternatives = 5;
 
       recognitionRef.current.onresult = (event) => {
         const results = event.results[0];
         const text = results[0].transcript.toLowerCase().trim();
         const confidence = results[0].confidence;
         
-        // Get all alternatives for better matching
         const alternatives = [];
         for (let i = 0; i < results.length; i++) {
           alternatives.push(results[i].transcript.toLowerCase().trim());
@@ -144,7 +142,6 @@ export default function VoiceModal({ isOpen, onClose }) {
     }
   };
 
-  // Fuzzy matching for voice commands
   const isYesCommand = (text, alternatives = []) => {
     const yesWords = ['yes', 'yeah', 'yep', 'ok', 'okay', 'sure', 'yah', 'ya', 'yas', 'yess', 'yees'];
     const allTexts = [text, ...alternatives];
@@ -286,12 +283,15 @@ export default function VoiceModal({ isOpen, onClose }) {
         if (recipe && recipe.id) {
           console.log("🚀 Recipe confirmed, navigating to ID:", recipe.id);
           
+          // Speak first, then navigate
           await speak("Perfect! Opening your recipe with automatic voice cooking guide. Get ready to cook!", false);
           
+          // Thoda delay taaki user sun sake
           setTimeout(() => {
             console.log("🚀 NAVIGATING NOW to recipe:", recipe.id);
             cleanup();
             onClose();
+            // 👇 FIX IS HERE: recipeId -> recipe.id
             navigate(`/recipe/${recipe.id}?voice=true`);
           }, 1500);
           
@@ -319,12 +319,10 @@ export default function VoiceModal({ isOpen, onClose }) {
 
   const searchAndShow = async (query) => {
     console.log("🔍 Searching and showing for:", query);
-    
     const results = await searchRecipes(query);
     
     if (results.length > 0) {
       console.log("📊 Setting results:", results.length, "recipes found");
-      
       setSearchResults(results);
       setCurrentRecipeIndex(0);
       setWaitingForConfirmation(true);
@@ -338,7 +336,6 @@ export default function VoiceModal({ isOpen, onClose }) {
       console.log("✅ Showing recipe 1 of", results.length, ":", recipe.title, "| ID:", recipe.id);
       
       const message = `Found ${recipe.title}. This recipe takes ${recipe.cookTime} and serves ${recipe.servings} people. Say YES to see this recipe in detail, or say NO or NEXT for other options.`;
-      
       await speak(message);
       
     } else {
@@ -365,7 +362,6 @@ export default function VoiceModal({ isOpen, onClose }) {
       console.log("✅ Showing recipe", nextIndex + 1, "of", totalResults, ":", recipe.title, "| ID:", recipe.id);
       
       const message = `Here's option ${nextIndex + 1}: ${recipe.title}. This takes ${recipe.cookTime} and serves ${recipe.servings} people. Say YES to see this recipe, or NO or NEXT for more options.`;
-      
       await speak(message);
       
     } else {
@@ -474,12 +470,11 @@ export default function VoiceModal({ isOpen, onClose }) {
                 </div>
               </div>
               
-              {/* Manual YES button for testing */}
               <button
                 onClick={handleManualYes}
                 className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-bold text-sm"
               >
-                🖱️ Manual YES (Working!)
+                🖱️ Manual YES
               </button>
             </div>
           )}
@@ -504,22 +499,13 @@ export default function VoiceModal({ isOpen, onClose }) {
             )}
           </div>
 
-          {/* Voice Recognition Tips */}
           <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded-lg mb-4">
             <p><strong>💡 Voice Tips:</strong></p>
             <p>• Speak clearly and loudly</p>
-            <p>• Try: "YES", "YEP", "SURE" for confirmation</p>
-            <p>• Try: "NO", "NEXT", "SKIP" for other options</p>
-            <p>• Manual buttons work perfectly!</p>
+            <p>• Try: "YES", "YEP" for confirmation</p>
+            <p>• Try: "NO", "NEXT" for other options</p>
           </div>
 
-          {/* Debug Status */}
-          <div className="text-xs text-gray-500 bg-gray-100 p-3 rounded-lg">
-            <p><strong>Status:</strong> {isSpeaking ? 'Speaking' : isListening ? 'Listening' : 'Ready'}</p>
-            <p><strong>Mode:</strong> {waitingForConfirmation ? '🔴 Confirmation' : '🔵 Search'}</p>
-            <p><strong>Results:</strong> {searchResults.length} recipes</p>
-            <p><strong>Current:</strong> {currentRecipeRef.current ? `${currentIndexRef.current + 1}. ${currentRecipeRef.current.title} (ID: ${currentRecipeRef.current.id})` : 'None'}</p>
-          </div>
         </div>
       </div>
     </div>

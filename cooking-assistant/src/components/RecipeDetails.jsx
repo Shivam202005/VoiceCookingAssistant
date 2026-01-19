@@ -1,38 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 
-// Proxy use kar rahe hain, isliye direct /api
 const API_BASE_URL = "/api";
 
 export default function RecipeDetails() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams(); // URL parameters padhne ke liye
+  
+  // 🔥 IMPORTANT: Check karo ki user Voice Search se aaya hai ya nahi
+  const isAutoVoiceMode = searchParams.get('voice') === 'true';
+
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
   // Voice states
   const [isReading, setIsReading] = useState(false);
-  const [aiThinking, setAiThinking] = useState(false); // ✅ NEW: AI loading state
-  const [currentSection, setCurrentSection] = useState("");
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [aiThinking, setAiThinking] = useState(false);
   const [currentText, setCurrentText] = useState("");
-  const [voiceReady, setVoiceReady] = useState(false);
-
-  const isReadingRef = useRef(false);
-  const isVoiceMode = searchParams.get('voice') === 'true';
-
-  // Voice setup (Same as before)
-  useEffect(() => {
-    const checkVoices = () => {
-      const voices = speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        setVoiceReady(true);
-      }
-    };
-    checkVoices();
-    speechSynthesis.onvoiceschanged = checkVoices;
-  }, []);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0); // UI highlight ke liye
+  
+  // Refs (Loop control aur Memory ke liye)
+  const isReadingRef = useRef(false);  // Loop ko rokne/chalane ke liye
+  const stepIndexRef = useRef(0);      // Current Step yaad rakhne ke liye
 
   // Fetch Recipe
   useEffect(() => {
@@ -52,22 +42,32 @@ export default function RecipeDetails() {
     if (id) fetchRecipe();
   }, [id]);
 
-  // TTS Function
+  // 🔥 CONDITIONAL AUTO-START Logic
+  // Sirf tab start hoga jab 'recipe' load ho AND 'isAutoVoiceMode' true ho
+  useEffect(() => {
+    if (recipe && isAutoVoiceMode && !isReadingRef.current) {
+        // Thoda wait karke start karte hain
+        setTimeout(() => {
+            startVoiceReading(0); // 0 se start karo
+        }, 1000);
+    }
+  }, [recipe, isAutoVoiceMode]);
+
+  // TTS Helper (Bolne wala function)
   const speak = (text) => {
     return new Promise((resolve) => {
-      // Agar AI bol raha hai to purana reading rok do
-      speechSynthesis.cancel();
+      speechSynthesis.cancel(); // Purana kuch bhi bol raha ho to chup karao
       setCurrentText(text);
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       
       const voices = speechSynthesis.getVoices();
-      const googleVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female'));
+      // Female Google voice prefer karenge
+      const googleVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female')) || voices[0];
       if (googleVoice) utterance.voice = googleVoice;
 
       utterance.onend = () => {
-        setCurrentText("");
         resolve();
       };
       
@@ -75,74 +75,45 @@ export default function RecipeDetails() {
     });
   };
 
-  // 🔥 NEW: AI Question Handler
-  const handleAskAI = () => {
-    // 1. Reading roko
-    stopReading();
+  // 🔥 SMART READING LOOP (Resume capability ke saath)
+  const startVoiceReading = async (startIndex = 0) => {
+    if (isReadingRef.current) return; // Already chal raha hai to ignore karo
     
-    // 2. Recognition start karo
-    const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
-    recognition.lang = 'en-US'; // English me sunega
-    recognition.start();
-
-    setCurrentText("🎧 Listening... Ask about substitutes or steps!");
-
-    recognition.onresult = async (event) => {
-        const question = event.results[0][0].transcript;
-        console.log("🗣️ User Asked:", question);
-        setCurrentText(`Thinking about: "${question}"...`);
-        setAiThinking(true);
-
-        try {
-            // 3. Backend se pucho
-            const res = await fetch(`${API_BASE_URL}/ask-ai`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    context: recipe // Puri recipe bhej rahe hain
-                })
-            });
-
-            const data = await res.json();
-            setAiThinking(false);
-            
-            // 4. Jawab bolo
-            await speak(data.answer);
-
-        } catch (err) {
-            setAiThinking(false);
-            speak("Sorry, I couldn't connect to my brain.");
-        }
-    };
-
-    recognition.onerror = () => {
-        setCurrentText("❌ Didn't catch that. Try again.");
-    };
-  };
-
-  // ... (startVoiceReading aur stopReading same rahenge) ...
-  const startVoiceReading = async () => {
-    if (!recipe || isReadingRef.current) return;
     setIsReading(true);
     isReadingRef.current = true;
     
     try {
-        await speak(`Starting ${recipe.title}.`);
-        if(!isReadingRef.current) return;
-
-        // Steps Loop
-        for (let i = 0; i < recipe.steps.length; i++) {
-            if(!isReadingRef.current) break;
-            setCurrentStepIndex(i);
-            setCurrentSection("steps");
-            await speak(`Step ${i+1}. ${recipe.steps[i]}`);
-            await new Promise(r => setTimeout(r, 1000));
+        // Intro message based on start index
+        if(startIndex === 0) {
+            await speak(`Starting ${recipe.title}. Let's cook!`);
+        } else {
+            await speak(`Resuming from step ${startIndex + 1}.`);
         }
-        if(isReadingRef.current) await speak("Recipe complete!");
+
+        // Loop Steps
+        for (let i = startIndex; i < recipe.steps.length; i++) {
+            // Agar beech me rok diya (Ask AI ke liye), to loop break karo
+            if(!isReadingRef.current) break; 
+
+            stepIndexRef.current = i; // Ref update karo (Resume karne ke liye yaad rakho)
+            setCurrentStepIndex(i);   // UI update karo taaki step highlight ho
+            
+            // Step bolo
+            await speak(`Step ${i+1}. ${recipe.steps[i]}`);
+            
+            // Thoda pause har step ke baad
+            await new Promise(r => setTimeout(r, 1500));
+        }
+
+        // Agar pura loop khatam ho gaya (bina roke)
+        if(isReadingRef.current) {
+             await speak("Recipe complete! Enjoy your meal.");
+             setIsReading(false);
+             isReadingRef.current = false;
+             stepIndexRef.current = 0; // Reset kar do
+        }
+
     } catch(e) { console.log(e); }
-    setIsReading(false);
-    isReadingRef.current = false;
   };
 
   const stopReading = () => {
@@ -152,74 +123,139 @@ export default function RecipeDetails() {
     setCurrentText("");
   };
 
-  if (loading) return <div className="p-10 text-center">Loading...</div>;
+  // 🔥 ASK AI & AUTO-RESUME
+  const handleAskAI = () => {
+    // 1. Current Reading Roko
+    stopReading(); 
+    
+    const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.start();
+
+    setCurrentText("🎧 Listening... Ask me anything!");
+
+    recognition.onresult = async (event) => {
+        const question = event.results[0][0].transcript;
+        console.log("🗣️ User Asked:", question);
+        setCurrentText(`Thinking: "${question}"...`);
+        setAiThinking(true);
+
+        try {
+            // 2. AI se pucho
+            const res = await fetch(`${API_BASE_URL}/ask-ai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: question,
+                    context: recipe
+                })
+            });
+
+            const data = await res.json();
+            setAiThinking(false);
+            
+            // 3. AI ka jawab bolo
+            await speak(data.answer);
+
+            // 4. 🔥 AUTO RESUME (Jadu Yahan Hai)
+            // AI ke chup hote hi wapas wahin se shuru jahan chhoda tha
+            setTimeout(() => {
+                startVoiceReading(stepIndexRef.current);
+            }, 500);
+
+        } catch (err) {
+            setAiThinking(false);
+            speak("Sorry, connection error.");
+        }
+    };
+
+    recognition.onerror = () => {
+        setAiThinking(false);
+        setCurrentText("❌ Didn't catch that. Try again.");
+    };
+  };
+
+  if (loading) return <div className="p-10 text-center text-xl">Loading your delicious recipe...</div>;
   if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
   if (!recipe) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <Link to="/" className="text-green-600 font-bold mb-4 inline-block">← Back</Link>
+        <Link to="/" className="text-green-600 font-bold mb-4 inline-block hover:underline">← Back to Recipes</Link>
 
         {/* 🧠 AI CONTROL CENTER */}
-        <div className="bg-white p-6 rounded-2xl shadow-xl border-2 border-orange-200 mb-8 text-center relative overflow-hidden">
+        <div className={`p-6 rounded-2xl shadow-xl border-2 mb-8 text-center relative overflow-hidden transition-all duration-300 ${aiThinking ? 'bg-orange-50 border-orange-400' : 'bg-white border-blue-100'}`}>
             
-            {/* Background Animation if AI is Thinking */}
-            {aiThinking && <div className="absolute inset-0 bg-orange-100 animate-pulse opacity-50"></div>}
-
-            <h2 className="text-2xl font-bold mb-4 relative z-10">🤖 AI Kitchen Assistant</h2>
+            <h2 className="text-2xl font-bold mb-2 text-gray-800">
+                {aiThinking ? '🤖 Chef AI is Thinking...' : '🤖 AI Kitchen Assistant'}
+            </h2>
             
-            <p className="text-gray-600 mb-6 min-h-[3rem] relative z-10 font-medium text-lg">
-                {currentText || "Click 'Ask AI' to ask about substitutes, repeat steps, or nutrition!"}
+            <p className="text-gray-600 mb-6 min-h-[3rem] font-medium text-lg flex items-center justify-center">
+                {currentText || (isReading ? `Reading Step ${currentStepIndex + 1}...` : "I am ready! Click 'Read Recipe' or 'Ask AI'.")}
             </p>
 
-            <div className="flex justify-center gap-4 relative z-10">
+            <div className="flex justify-center gap-4">
                 {/* 🎤 ASK AI BUTTON */}
                 <button 
                     onClick={handleAskAI}
                     disabled={aiThinking}
-                    className={`px-8 py-4 rounded-full font-bold text-lg shadow-lg transition-all transform hover:scale-105 flex items-center gap-2 ${
-                        aiThinking ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:shadow-purple-200'
-                    }`}
+                    className="px-8 py-4 rounded-full font-bold text-lg shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 transition-transform flex items-center gap-2"
                 >
-                    {aiThinking ? '🧠 Thinking...' : '🎤 Ask AI Help'}
+                    {aiThinking ? '⏳ Processing...' : '🎤 Ask AI Help (Pauses Recipe)'}
                 </button>
 
-                {/* READ RECIPE BUTTON */}
+                {/* MANUAL CONTROLS */}
                 {!isReading ? (
-                    <button onClick={startVoiceReading} className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg">
-                        ▶️ Read Recipe
+                    <button 
+                        onClick={() => startVoiceReading(stepIndexRef.current)} 
+                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-full font-bold shadow-lg"
+                    >
+                        {stepIndexRef.current === 0 ? '▶️ Read Recipe' : '▶️ Resume Recipe'}
                     </button>
                 ) : (
-                    <button onClick={stopReading} className="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg">
-                        ⏹️ Stop Reading
+                    <button onClick={stopReading} className="bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-full font-bold shadow-lg">
+                        ⏸️ Pause
                     </button>
                 )}
             </div>
         </div>
 
-        {/* Recipe Content (Same as before) */}
+        {/* Recipe Content */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <img src={recipe.img} alt={recipe.title} className="w-full h-64 object-cover"/>
+            <img src={recipe.img || recipe.image_url} alt={recipe.title} className="w-full h-72 object-cover"/>
             <div className="p-8">
-                <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
+                <h1 className="text-4xl font-extrabold mb-6 text-gray-800">{recipe.title}</h1>
                 
-                {/* Ingredients */}
-                <div className="mb-8">
-                    <h3 className="text-xl font-bold mb-4">Ingredients</h3>
-                    <ul className="list-disc pl-5 space-y-2">
-                        {recipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                    </ul>
+                {/* Ingredients Grid */}
+                <div className="mb-8 p-6 bg-yellow-50 rounded-xl border border-yellow-100">
+                    <h3 className="text-2xl font-bold mb-4 text-yellow-800">🥕 Ingredients</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {recipe.ingredients.map((ing, i) => (
+                            <div key={i} className="flex items-center gap-2 text-gray-700">
+                                <span className="text-orange-500">•</span> {ing}
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Steps */}
+                {/* Steps List (Active Step Highlighting) */}
                 <div>
-                    <h3 className="text-xl font-bold mb-4">Instructions</h3>
-                    <div className="space-y-4">
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800">👨‍🍳 Instructions</h3>
+                    <div className="space-y-6">
                         {recipe.steps.map((step, i) => (
-                            <div key={i} className={`p-4 rounded-lg border ${currentStepIndex === i && isReading ? 'bg-green-100 border-green-500' : 'bg-gray-50'}`}>
-                                <span className="font-bold text-orange-600 mr-2">Step {i+1}:</span>
-                                {step}
+                            <div 
+                                key={i} 
+                                className={`p-6 rounded-xl border-l-4 transition-all duration-300 ${
+                                    currentStepIndex === i 
+                                    ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' 
+                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>
+                                    Step {i+1}
+                                </h4>
+                                <p className="text-gray-700 leading-relaxed text-lg">{step}</p>
                             </div>
                         ))}
                     </div>
