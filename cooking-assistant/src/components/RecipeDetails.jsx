@@ -1,30 +1,36 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const API_BASE_URL = "/api";
 
 export default function RecipeDetails() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams(); // URL parameters padhne ke liye
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   
-  // 🔥 IMPORTANT: Check karo ki user Voice Search se aaya hai ya nahi
   const isAutoVoiceMode = searchParams.get('voice') === 'true';
 
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // 🔥 NEW STATES FOR LIKE & COMMENT
+  const [likes, setLikes] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  
   // Voice states
   const [isReading, setIsReading] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const [currentText, setCurrentText] = useState("");
-  const [currentStepIndex, setCurrentStepIndex] = useState(0); // UI highlight ke liye
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   
-  // Refs (Loop control aur Memory ke liye)
-  const isReadingRef = useRef(false);  // Loop ko rokne/chalane ke liye
-  const stepIndexRef = useRef(0);      // Current Step yaad rakhne ke liye
+  const isReadingRef = useRef(false);
+  const stepIndexRef = useRef(0);
 
-  // Fetch Recipe
+  // Fetch Recipe Data
   useEffect(() => {
     async function fetchRecipe() {
       try {
@@ -32,7 +38,26 @@ export default function RecipeDetails() {
         const response = await fetch(`${API_BASE_URL}/recipe/${id}`);
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         const data = await response.json();
+        
         setRecipe(data);
+        
+        // Initialize Likes & Comments
+        setLikes(data.likes_count || 0);
+        setComments(data.comments || []);
+
+        // Check if current user already liked this recipe
+        if (user) {
+            try {
+                const likeRes = await fetch(`${API_BASE_URL}/recipe/${id}/is_liked`);
+                if (likeRes.ok) {
+                    const likeData = await likeRes.json();
+                    setIsLiked(likeData.is_liked);
+                }
+            } catch (err) {
+                console.error("Error checking like status:", err);
+            }
+        }
+
       } catch (error) {
         setError(error.message);
       } finally {
@@ -40,30 +65,27 @@ export default function RecipeDetails() {
       }
     }
     if (id) fetchRecipe();
-  }, [id]);
+  }, [id, user]);
 
-  // 🔥 CONDITIONAL AUTO-START Logic
-  // Sirf tab start hoga jab 'recipe' load ho AND 'isAutoVoiceMode' true ho
+  // Auto-Start Voice Logic
   useEffect(() => {
     if (recipe && isAutoVoiceMode && !isReadingRef.current) {
-        // Thoda wait karke start karte hain
         setTimeout(() => {
-            startVoiceReading(0); // 0 se start karo
+            startVoiceReading(0);
         }, 1000);
     }
   }, [recipe, isAutoVoiceMode]);
 
-  // TTS Helper (Bolne wala function)
+  // TTS Helper
   const speak = (text) => {
     return new Promise((resolve) => {
-      speechSynthesis.cancel(); // Purana kuch bhi bol raha ho to chup karao
+      speechSynthesis.cancel();
       setCurrentText(text);
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       
       const voices = speechSynthesis.getVoices();
-      // Female Google voice prefer karenge
       const googleVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female')) || voices[0];
       if (googleVoice) utterance.voice = googleVoice;
 
@@ -75,42 +97,37 @@ export default function RecipeDetails() {
     });
   };
 
-  // 🔥 SMART READING LOOP (Resume capability ke saath)
+  // Reading Loop
   const startVoiceReading = async (startIndex = 0) => {
-    if (isReadingRef.current) return; // Already chal raha hai to ignore karo
+    if (isReadingRef.current) return;
     
     setIsReading(true);
     isReadingRef.current = true;
     
     try {
-        // Intro message based on start index
         if(startIndex === 0) {
             await speak(`Starting ${recipe.title}. Let's cook!`);
         } else {
             await speak(`Resuming from step ${startIndex + 1}.`);
         }
 
-        // Loop Steps
         for (let i = startIndex; i < recipe.steps.length; i++) {
-            // Agar beech me rok diya (Ask AI ke liye), to loop break karo
             if(!isReadingRef.current) break; 
 
-            stepIndexRef.current = i; // Ref update karo (Resume karne ke liye yaad rakho)
-            setCurrentStepIndex(i);   // UI update karo taaki step highlight ho
+            stepIndexRef.current = i;
+            setCurrentStepIndex(i);
             
-            // Step bolo
-            await speak(`Step ${i+1}. ${recipe.steps[i]}`);
-            
-            // Thoda pause har step ke baad
+            // Step object handling (just like ingredients)
+            const stepText = typeof recipe.steps[i] === 'object' ? recipe.steps[i].step || JSON.stringify(recipe.steps[i]) : recipe.steps[i];
+            await speak(`Step ${i+1}. ${stepText}`);
             await new Promise(r => setTimeout(r, 1500));
         }
 
-        // Agar pura loop khatam ho gaya (bina roke)
         if(isReadingRef.current) {
              await speak("Recipe complete! Enjoy your meal.");
              setIsReading(false);
              isReadingRef.current = false;
-             stepIndexRef.current = 0; // Reset kar do
+             stepIndexRef.current = 0;
         }
 
     } catch(e) { console.log(e); }
@@ -123,9 +140,8 @@ export default function RecipeDetails() {
     setCurrentText("");
   };
 
-  // 🔥 ASK AI & AUTO-RESUME
+  // Ask AI
   const handleAskAI = () => {
-    // 1. Current Reading Roko
     stopReading(); 
     
     const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
@@ -136,12 +152,10 @@ export default function RecipeDetails() {
 
     recognition.onresult = async (event) => {
         const question = event.results[0][0].transcript;
-        console.log("🗣️ User Asked:", question);
         setCurrentText(`Thinking: "${question}"...`);
         setAiThinking(true);
 
         try {
-            // 2. AI se pucho
             const res = await fetch(`${API_BASE_URL}/ask-ai`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -154,11 +168,8 @@ export default function RecipeDetails() {
             const data = await res.json();
             setAiThinking(false);
             
-            // 3. AI ka jawab bolo
             await speak(data.answer);
 
-            // 4. 🔥 AUTO RESUME (Jadu Yahan Hai)
-            // AI ke chup hote hi wapas wahin se shuru jahan chhoda tha
             setTimeout(() => {
                 startVoiceReading(stepIndexRef.current);
             }, 500);
@@ -175,6 +186,51 @@ export default function RecipeDetails() {
     };
   };
 
+  // 🔥 HANDLE LIKE
+  const handleLike = async () => {
+    if (!user) return alert("Please login to like recipes!");
+    
+    const originalLikes = likes;
+    const originalIsLiked = isLiked;
+    
+    setLikes(isLiked ? likes - 1 : likes + 1);
+    setIsLiked(!isLiked);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/recipe/${recipe.id}/like`, { method: 'POST' });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setLikes(data.likes_count); 
+    } catch (error) {
+        setLikes(originalLikes);
+        setIsLiked(originalIsLiked);
+        console.error(error);
+    }
+  };
+
+  // 🔥 HANDLE COMMENT
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) return alert("Please login to comment!");
+    if (!newComment.trim()) return;
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/recipe/${recipe.id}/comment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: newComment })
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            setComments([...comments, data.comment]);
+            setNewComment("");
+        }
+    } catch (error) {
+        console.error(error);
+    }
+  };
+
   if (loading) return <div className="p-10 text-center text-xl">Loading your delicious recipe...</div>;
   if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
   if (!recipe) return null;
@@ -186,31 +242,18 @@ export default function RecipeDetails() {
 
         {/* 🧠 AI CONTROL CENTER */}
         <div className={`p-6 rounded-2xl shadow-xl border-2 mb-8 text-center relative overflow-hidden transition-all duration-300 ${aiThinking ? 'bg-orange-50 border-orange-400' : 'bg-white border-blue-100'}`}>
-            
             <h2 className="text-2xl font-bold mb-2 text-gray-800">
                 {aiThinking ? '🤖 Chef AI is Thinking...' : '🤖 AI Kitchen Assistant'}
             </h2>
-            
             <p className="text-gray-600 mb-6 min-h-[3rem] font-medium text-lg flex items-center justify-center">
                 {currentText || (isReading ? `Reading Step ${currentStepIndex + 1}...` : "I am ready! Click 'Read Recipe' or 'Ask AI'.")}
             </p>
-
             <div className="flex justify-center gap-4">
-                {/* 🎤 ASK AI BUTTON */}
-                <button 
-                    onClick={handleAskAI}
-                    disabled={aiThinking}
-                    className="px-8 py-4 rounded-full font-bold text-lg shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 transition-transform flex items-center gap-2"
-                >
-                    {aiThinking ? '⏳ Processing...' : '🎤 Ask AI Help (Pauses Recipe)'}
+                <button onClick={handleAskAI} disabled={aiThinking} className="px-8 py-4 rounded-full font-bold text-lg shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 transition-transform flex items-center gap-2">
+                    {aiThinking ? '⏳ Processing...' : '🎤 Ask AI Help'}
                 </button>
-
-                {/* MANUAL CONTROLS */}
                 {!isReading ? (
-                    <button 
-                        onClick={() => startVoiceReading(stepIndexRef.current)} 
-                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-full font-bold shadow-lg"
-                    >
+                    <button onClick={() => startVoiceReading(stepIndexRef.current)} className="bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-full font-bold shadow-lg">
                         {stepIndexRef.current === 0 ? '▶️ Read Recipe' : '▶️ Resume Recipe'}
                     </button>
                 ) : (
@@ -223,9 +266,15 @@ export default function RecipeDetails() {
 
         {/* Recipe Content */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <img src={recipe.img || recipe.image_url} alt={recipe.title} className="w-full h-72 object-cover"/>
+            <img src={recipe.image_url || recipe.img} alt={recipe.title} className="w-full h-72 object-cover"/>
             <div className="p-8">
-                <h1 className="text-4xl font-extrabold mb-6 text-gray-800">{recipe.title}</h1>
+                <div className="flex justify-between items-start">
+                    <h1 className="text-4xl font-extrabold mb-6 text-gray-800 flex-1">{recipe.title}</h1>
+                    <div className="flex flex-col items-center bg-red-50 p-2 rounded-lg border border-red-100">
+                        <span className="text-2xl font-bold text-red-500">❤️ {likes}</span>
+                        <span className="text-xs text-red-400 font-medium">Likes</span>
+                    </div>
+                </div>
                 
                 {/* Ingredients Grid */}
                 <div className="mb-8 p-6 bg-yellow-50 rounded-xl border border-yellow-100">
@@ -233,34 +282,98 @@ export default function RecipeDetails() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {recipe.ingredients.map((ing, i) => (
                             <div key={i} className="flex items-center gap-2 text-gray-700">
-                                <span className="text-orange-500">•</span> {ing}
+                                <span className="text-orange-500">•</span> 
+                                {/* ✅ ERROR FIX: Check karo ki ing object hai ya string */}
+                                {typeof ing === 'object' ? (ing.original || ing.name) : ing}
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Steps List (Active Step Highlighting) */}
+                {/* Steps List */}
                 <div>
                     <h3 className="text-2xl font-bold mb-6 text-gray-800">👨‍🍳 Instructions</h3>
                     <div className="space-y-6">
                         {recipe.steps.map((step, i) => (
-                            <div 
-                                key={i} 
-                                className={`p-6 rounded-xl border-l-4 transition-all duration-300 ${
-                                    currentStepIndex === i 
-                                    ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' 
-                                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                                }`}
-                            >
-                                <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>
-                                    Step {i+1}
-                                </h4>
-                                <p className="text-gray-700 leading-relaxed text-lg">{step}</p>
+                            <div key={i} className={`p-6 rounded-xl border-l-4 transition-all duration-300 ${currentStepIndex === i ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                                <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>Step {i+1}</h4>
+                                {/* ✅ ERROR FIX: Check karo ki step object hai ya string */}
+                                <p className="text-gray-700 leading-relaxed text-lg">
+                                    {typeof step === 'object' ? step.step || "Instruction missing" : step}
+                                </p>
                             </div>
                         ))}
                     </div>
                 </div>
             </div>
+        </div>
+
+        {/* LIKE & COMMENT SECTION */}
+        <div className="bg-white rounded-2xl shadow-lg mt-8 p-8 border border-gray-100">
+            {/* Like Action */}
+            <div className="flex items-center gap-4 mb-8 border-b pb-6">
+                <button 
+                    onClick={handleLike}
+                    className={`flex items-center gap-2 px-8 py-3 rounded-full font-bold text-lg transition-all shadow-sm ${
+                        isLiked 
+                        ? 'bg-red-500 text-white shadow-red-200 transform scale-105' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                    {isLiked ? '❤️ Liked' : '🤍 Like Recipe'} 
+                </button>
+                <span className="text-gray-500 text-sm">
+                    {isLiked ? 'You loved this!' : 'Did you like this recipe?'}
+                </span>
+            </div>
+
+            {/* Comments Area */}
+            <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                💬 Comments <span className="text-gray-400 text-lg font-normal">({comments.length})</span>
+            </h3>
+            
+            <div className="space-y-4 mb-8 max-h-96 overflow-y-auto pr-2">
+                {comments.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                        <p className="text-gray-400 italic">No comments yet. Be the first to share your thoughts!</p>
+                    </div>
+                ) : (
+                    comments.map((comment) => (
+                        <div key={comment.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-orange-200 rounded-full flex items-center justify-center text-orange-700 font-bold text-xs">
+                                        {comment.user ? comment.user.charAt(0).toUpperCase() : 'U'}
+                                    </div>
+                                    <span className="font-bold text-gray-800">{comment.user}</span>
+                                </div>
+                                <span className="text-xs text-gray-400">{comment.date}</span>
+                            </div>
+                            <p className="text-gray-700 ml-10">{comment.text}</p>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Add Comment Form */}
+            {user ? (
+                <form onSubmit={handleCommentSubmit} className="flex gap-3">
+                    <input 
+                        type="text" 
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write a comment..." 
+                        className="flex-1 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-gray-50 focus:bg-white transition-all"
+                    />
+                    <button type="submit" className="bg-orange-500 text-white px-8 py-4 rounded-xl font-bold hover:bg-orange-600 shadow-md transition-transform hover:scale-105">
+                        Post
+                    </button>
+                </form>
+            ) : (
+                <div className="text-center p-4 bg-yellow-50 rounded-xl text-yellow-800 border border-yellow-200">
+                    <span className="font-bold">🔒 Login</span> to like and comment on this recipe.
+                </div>
+            )}
         </div>
 
       </div>

@@ -1,149 +1,161 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+
+const API_BASE_URL = "/api";
 
 export default function ShareRecipeModal({ onClose, onUploadSuccess }) {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    cookTime: '',
-    servings: '',
-    difficulty: 'Easy',
-    is_paid: false,
-    image_url: ''
-  });
-
-  const [ingredients, setIngredients] = useState(['']);
-  const [steps, setSteps] = useState(['']);
+  const { user } = useAuth();
+  
+  // Form States
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
+  const [cookTime, setCookTime] = useState('');
+  const [servings, setServings] = useState('');
+  const [ingredients, setIngredients] = useState('');
+  const [steps, setSteps] = useState('');
+  
+  // 🔥 IMAGE STATES
+  const [imageFile, setImageFile] = useState(null); // File object
+  const [previewUrl, setPreviewUrl] = useState(null); // Preview ke liye
+  
+  const [isPaid, setIsPaid] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleAddIngredient = () => setIngredients([...ingredients, '']);
-  const handleAddStep = () => setSteps([...steps, '']);
-
-  const handleIngredientChange = (index, value) => {
-    const newIngredients = [...ingredients];
-    newIngredients[index] = value;
-    setIngredients(newIngredients);
-  };
-
-  const handleStepChange = (index, value) => {
-    const newSteps = [...steps];
-    newSteps[index] = value;
-    setSteps(newSteps);
+  // Image Select Handler
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file)); // Local preview dikhane ke liye
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const recipeData = {
-      ...formData,
-      ingredients: ingredients.filter(i => i.trim() !== ''),
-      steps: steps.filter(s => s.trim() !== '')
-    };
-
     try {
-      // 👇 CHANGE IS HERE: URL aur credentials
-      const response = await fetch('/api/recipes/upload', {
+      // Arrays convert karo
+      const ingredientsArray = ingredients.split('\n').filter(i => i.trim());
+      const stepsArray = steps.split('\n').filter(s => s.trim());
+
+      // 🔥 FORM DATA BANAO (File upload ke liye FormData zaroori hai)
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', desc);
+      formData.append('cookTime', cookTime);
+      formData.append('servings', servings);
+      formData.append('is_paid', isPaid);
+      
+      // Arrays ko JSON string banakar bhejo
+      formData.append('ingredients', JSON.stringify(ingredientsArray));
+      formData.append('steps', JSON.stringify(stepsArray));
+
+      // Image File append karo
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+
+      // API Call
+      const token = localStorage.getItem('user'); // Agar token header chahiye (optional based on auth setup)
+      
+      const response = await fetch(`${API_BASE_URL}/recipes/upload`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(recipeData),
-        credentials: 'include' // 🔥 YE LINE SABSE ZAROORI HAI (Iske bina upload nahi hoga)
+        // Note: 'Content-Type': 'multipart/form-data' mat lagana, browser khud lagata hai
+        body: formData, 
       });
 
-      if (response.ok) {
-        alert('Recipe Uploaded Successfully! 🎉');
-        onUploadSuccess(); // List refresh karega
-        onClose();
-      } else {
-        const data = await response.json();
-        alert('Failed to upload: ' + (data.error || 'Unknown error'));
-      }
+      if (!response.ok) throw new Error('Upload failed');
+
+      alert('Recipe Uploaded Successfully! 🎉');
+      onUploadSuccess(); // Refresh list
+      onClose(); // Close modal
+
     } catch (error) {
-      console.error('Error:', error);
-      alert('Server error. Is backend running?');
+      console.error(error);
+      alert('Error uploading recipe.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 overflow-y-auto py-10">
-      <div className="bg-white rounded-2xl w-full max-w-2xl m-4 p-6 relative shadow-2xl">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold">×</button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold">×</button>
         
-        <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">🍳 Share Your Recipe</h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="p-8">
+          <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">Share Your Recipe 🍳</h2>
           
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input required type="text" placeholder="Recipe Title (e.g. Paneer Tikka)" className="p-3 border rounded-lg w-full"
-              onChange={e => setFormData({...formData, title: e.target.value})} />
+          <form onSubmit={handleSubmit} className="space-y-6">
             
-            <select className="p-3 border rounded-lg w-full"
-              onChange={e => setFormData({...formData, difficulty: e.target.value})}>
-              <option value="Easy">Easy</option>
-              <option value="Medium">Medium</option>
-              <option value="Hard">Hard</option>
-            </select>
-          </div>
+            {/* 📸 IMAGE UPLOAD SECTION */}
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition-colors">
+                <label className="cursor-pointer block">
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageChange} 
+                        className="hidden" 
+                    />
+                    {previewUrl ? (
+                        <img src={previewUrl} alt="Preview" className="h-48 mx-auto rounded-lg object-cover shadow-md" />
+                    ) : (
+                        <div className="text-gray-500">
+                            <span className="text-4xl block mb-2">📸</span>
+                            <span className="font-semibold">Click to Upload Recipe Photo</span>
+                            <p className="text-xs mt-1 text-gray-400">JPG, PNG supported</p>
+                        </div>
+                    )}
+                </label>
+            </div>
 
-          <textarea required placeholder="Short Description..." className="p-3 border rounded-lg w-full h-24"
-            onChange={e => setFormData({...formData, description: e.target.value})} />
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Recipe Title</label>
+                    <input required type="text" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none" placeholder="e.g. Butter Chicken" value={title} onChange={e => setTitle(e.target.value)} />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
+                    <input type="text" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none" placeholder="Short and tasty description..." value={desc} onChange={e => setDesc(e.target.value)} />
+                </div>
+            </div>
 
-          {/* Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input required type="number" placeholder="Cook Time (mins)" className="p-3 border rounded-lg w-full"
-              onChange={e => setFormData({...formData, cookTime: e.target.value})} />
-            
-            <input required type="number" placeholder="Servings" className="p-3 border rounded-lg w-full"
-              onChange={e => setFormData({...formData, servings: e.target.value})} />
-              
-            <input type="text" placeholder="Image URL (Optional)" className="p-3 border rounded-lg w-full"
-              onChange={e => setFormData({...formData, image_url: e.target.value})} />
-          </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Cook Time (mins)</label>
+                    <input required type="number" className="w-full p-3 border rounded-lg" placeholder="30" value={cookTime} onChange={e => setCookTime(e.target.value)} />
+                </div>
+                <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Servings</label>
+                    <input required type="number" className="w-full p-3 border rounded-lg" placeholder="2" value={servings} onChange={e => setServings(e.target.value)} />
+                </div>
+            </div>
 
-          {/* Type Selector */}
-          <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border">
-            <span className="font-bold text-gray-700">Recipe Type:</span>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="type" checked={!formData.is_paid} onChange={() => setFormData({...formData, is_paid: false})} />
-              <span className="text-green-600 font-bold">Free</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="type" checked={formData.is_paid} onChange={() => setFormData({...formData, is_paid: true})} />
-              <span className="text-orange-600 font-bold">Premium (Paid)</span>
-            </label>
-          </div>
+            {/* Ingredients & Steps */}
+            <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Ingredients (One per line)</label>
+                <textarea required className="w-full p-3 border rounded-lg h-24" placeholder="2 Onions&#10;1 tsp Salt&#10;500g Chicken" value={ingredients} onChange={e => setIngredients(e.target.value)}></textarea>
+            </div>
 
-          {/* Ingredients */}
-          <div>
-            <h3 className="font-bold mb-2">Ingredients</h3>
-            {ingredients.map((ing, i) => (
-              <input key={i} type="text" value={ing} placeholder={`Ingredient ${i+1}`} 
-                className="p-2 border rounded-lg w-full mb-2"
-                onChange={(e) => handleIngredientChange(i, e.target.value)} />
-            ))}
-            <button type="button" onClick={handleAddIngredient} className="text-sm text-blue-600 font-semibold">+ Add Ingredient</button>
-          </div>
+            <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Steps (One per line)</label>
+                <textarea required className="w-full p-3 border rounded-lg h-24" placeholder="Chop onions.&#10;Fry in pan.&#10;Add spices." value={steps} onChange={e => setSteps(e.target.value)}></textarea>
+            </div>
 
-          {/* Steps */}
-          <div>
-            <h3 className="font-bold mb-2">Cooking Steps</h3>
-            {steps.map((step, i) => (
-              <textarea key={i} value={step} placeholder={`Step ${i+1}`} 
-                className="p-2 border rounded-lg w-full mb-2"
-                onChange={(e) => handleStepChange(i, e.target.value)} />
-            ))}
-            <button type="button" onClick={handleAddStep} className="text-sm text-blue-600 font-semibold">+ Add Step</button>
-          </div>
+            {/* Premium Toggle */}
+            <div className="flex items-center gap-3 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <input type="checkbox" id="premium" className="w-5 h-5 text-orange-500" checked={isPaid} onChange={e => setIsPaid(e.target.checked)} />
+                <label htmlFor="premium" className="font-bold text-gray-700 cursor-pointer">Mark as Premium Recipe 🌟</label>
+            </div>
 
-          <button disabled={loading} type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold text-xl shadow-lg transition-all">
-            {loading ? 'Uploading...' : '🚀 Publish Recipe'}
-          </button>
+            <button disabled={loading} type="submit" className="w-full bg-orange-500 text-white py-4 rounded-full font-bold text-xl hover:bg-orange-600 shadow-lg transition-transform hover:scale-[1.02]">
+                {loading ? 'Uploading...' : '🚀 Publish Recipe'}
+            </button>
 
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

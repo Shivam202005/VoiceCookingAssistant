@@ -1,7 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-export default function RecipeCard({ id, title, desc, img, tag, cookTime, servings, difficulty }) {
+// ✅ Prop 'likes_count' add kiya
+export default function RecipeCard({ id, title, desc, img, image_url, tag, cookTime, servings, difficulty, likes_count }) {
+  
   const getBadgeColor = () => {
     if (tag === "FREE") return "bg-green-500 text-white";
     if (tag === "PREMIUM") return "bg-orange-500 text-white";
@@ -15,16 +17,19 @@ export default function RecipeCard({ id, title, desc, img, tag, cookTime, servin
     return "text-gray-600 bg-gray-100";
   };
 
-  // Clean description
+  // Image source fallback logic
+  const displayImage = image_url || img || "/images/f1.jpeg";
+
   const cleanDesc = desc?.replace(/<[^>]*>/g, '').substring(0, 120) + (desc?.length > 120 ? '...' : '');
 
   return (
     <Link to={`/recipe/${id}`} className="group block">
       <div className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border border-gray-100">
+        
         {/* Image Container */}
         <div className="relative h-48 overflow-hidden">
           <img
-            src={img || "/images/f1.jpeg"}
+            src={displayImage}
             alt={title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
@@ -39,33 +44,40 @@ export default function RecipeCard({ id, title, desc, img, tag, cookTime, servin
             </span>
           </div>
           
-          {/* Difficulty Badge */}
-          <div className="absolute top-3 right-3">
-            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDifficultyColor()}`}>
+          {/* 🔥 NEW: Likes Count Badge (Top Right) */}
+          <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+             {/* Difficulty */}
+             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getDifficultyColor()} shadow-sm`}>
               {difficulty}
             </span>
+            
+            {/* Likes */}
+            <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-bold text-red-500 shadow-md flex items-center gap-1">
+               ❤️ {likes_count || 0}
+            </div>
           </div>
+
         </div>
 
         {/* Content */}
         <div className="p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-3 group-hover:text-orange-600 transition-colors">
+          <h3 className="text-lg font-bold text-gray-800 mb-3 group-hover:text-orange-600 transition-colors truncate">
             {title}
           </h3>
           
-          <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+          <p className="text-gray-600 text-sm mb-4 leading-relaxed h-10 overflow-hidden">
             {cleanDesc}
           </p>
 
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center gap-1">
               <span className="text-orange-500">⏰</span>
-              <span className="font-medium">{cookTime}</span>
+              <span className="font-medium">{cookTime}m</span>
             </div>
             
             <div className="flex items-center gap-1">
               <span className="text-blue-500">👥</span>
-              <span className="font-medium">{servings} servings</span>
+              <span className="font-medium">{servings} ppl</span>
             </div>
           </div>
 

@@ -1,18 +1,45 @@
-# models.py - FULLY CORRECTED
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 db = SQLAlchemy()
 
+# 1. LIKE TABLE
+class Like(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
+
+# 2. COMMENT TABLE
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
+    
+    # User ka naam lane ke liye relationship
+    user = db.relationship('User', backref='comments')
+
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(150), nullable=False)
+
+    def set_password(self, password):
+        from flask_bcrypt import generate_password_hash
+        self.password_hash = generate_password_hash(password).decode('utf8')
+
+    def check_password(self, password):
+        from flask_bcrypt import check_password_hash
+        return check_password_hash(self.password_hash, password)
+
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    spoonacular_id = db.Column(db.Integer, unique=True)
-    title = db.Column(db.String(200), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
-    image_url = db.Column(db.String(500))
-    
+    image_url = db.Column(db.String(300))
     ready_in_minutes = db.Column(db.Integer)
     servings = db.Column(db.Integer)
     difficulty = db.Column(db.String(20))
@@ -20,59 +47,38 @@ class Recipe(db.Model):
     ingredients = db.Column(db.JSON)
     steps = db.Column(db.JSON)
     
-    # Future features
-    cuisines = db.Column(db.JSON)
-    diets = db.Column(db.JSON)
-    nutrition = db.Column(db.JSON)
-    
-    # AUTH FIELDS - FIXED INDENT
-    author_id = db.Column(db.Integer, db.ForeignKey('users.id', name='fk_recipe_author'), nullable=True)
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    category = db.Column(db.String(20), default='FREE') # FREE or PREMIUM
     is_paid = db.Column(db.Boolean, default=False)
     
-    category = db.Column(db.String(20), default='FREE')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    # Relationships
+    likes = db.relationship('Like', backref='recipe', lazy='dynamic')
+    comments = db.relationship('Comment', backref='recipe', lazy=True)
+
     def to_dict(self):
         return {
             'id': self.id,
             'title': self.title,
-            'desc': self.description,
-            'img': self.image_url or '/images/f1.jpeg',
-            'cookTime': f"{self.ready_in_minutes} minutes" if self.ready_in_minutes else "30 minutes",
-            'servings': self.servings or 4,
-            'difficulty': self.difficulty or 'Medium',
-            'tag': self.category,
-            'ingredients': self.get_simple_ingredients(),
-            'steps': self.steps or []
+            'description': self.description,
+            'image_url': self.image_url,
+            'cookTime': self.ready_in_minutes, # Frontend expects cookTime
+            'ready_in_minutes': self.ready_in_minutes,
+            'servings': self.servings,
+            'difficulty': self.difficulty,
+            'ingredients': self.ingredients,
+            'steps': self.steps,
+            
+            # 👇 YAHAN THA MAIN FIX
+            'category': self.category, # Database column name
+            'tag': self.category,      # ✅ FIX: Frontend 'tag' maang raha hai, isliye copy kiya
+            
+            'is_paid': self.is_paid,
+            'author_id': self.author_id,
+            'likes_count': self.likes.count(),
+            'comments': [{
+                'id': c.id,
+                'text': c.text,
+                'user': c.user.name,
+                'date': c.timestamp.strftime('%Y-%m-%d')
+            } for c in self.comments]
         }
-    
-    def get_simple_ingredients(self):
-        if not self.ingredients:
-            return []
-        
-        simple_ingredients = []
-        for ingredient in self.ingredients:
-            if isinstance(ingredient, dict):
-                simple_ingredients.append(ingredient.get('original', ingredient.get('name', '')))
-            else:
-                simple_ingredients.append(str(ingredient))
-        
-        return simple_ingredients
-
-# USER MODEL
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationship
-    recipes = db.relationship('Recipe', backref='author', lazy=True, foreign_keys='Recipe.author_id')
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
