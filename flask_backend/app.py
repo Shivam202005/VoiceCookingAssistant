@@ -227,6 +227,28 @@ def upload_recipe():
 with app.app_context():
     db.create_all()
 
+@app.route('/my-profile', methods=['GET'])
+@login_required
+def my_profile():
+    try:
+        # 1. User ki recipes nikalo
+        my_recipes = Recipe.query.filter_by(author_id=current_user.id).all()
+        
+        # 2. Response banao
+        return jsonify({
+            'user': {
+                'name': current_user.name,
+                'email': current_user.email,
+                'id': current_user.id
+            },
+            'stats': {
+                'total_recipes': len(my_recipes)
+            },
+            'recipes': [r.to_dict() for r in my_recipes] # Sirf is user ki recipes
+        })
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Something went wrong'}), 500
 if __name__ == '__main__':
     print("🚀 Server Started on Port 5000")
     print("🧠 AI Brain Status: Checking...")

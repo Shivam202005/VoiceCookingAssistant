@@ -11,6 +11,7 @@ import AllPremiumRecipes from "./components/AllPremiumRecipes";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthForm from './components/AuthForm';
 import ShareRecipeModal from './components/ShareRecipeModal';
+import Profile from "./components/Profile";
 
 const API_BASE_URL = "/api"; 
 
@@ -211,6 +212,7 @@ function App() {
           <Route path="/recipe/:id" element={<RecipeDetails />} />
           <Route path="/free-recipes" element={<AllFreeRecipes />} />
           <Route path="/premium-recipes" element={<AllPremiumRecipes />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </Router>
     </AuthProvider>
