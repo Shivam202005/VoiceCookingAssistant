@@ -1,32 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // ✅ 1. AuthContext import karo
 
 const API_BASE_URL = "/api";
 
 export default function Profile() {
+  const { user } = useAuth(); // ✅ 2. User data Context se lo (LocalStorage se nahi)
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchProfile() {
-      try {
-        const token = localStorage.getItem('user'); // Check login locally
-        if (!token) {
-            // ❌ Purana Code: navigate('/login');
-            // ✅ Sahi Code: Home page par bhej do
-            alert("Please log in to view your profile.");
-            navigate('/'); 
-            return;
-        }
+      // ✅ 3. Check: Agar Context me user nahi hai, tabhi redirect karo
+      if (!user) {
+        alert("Please log in to view your profile.");
+        navigate('/'); 
+        return;
+      }
 
+      try {
         const response = await fetch(`${API_BASE_URL}/my-profile`);
         
         if (response.status === 401) {
-            // Agar session expire ho gaya (backend se 401 aaya)
-            localStorage.removeItem('user');
+            // Agar backend bole ki session expire hai
             alert("Session expired. Please log in again.");
-            // ✅ Sahi Code: Home page par bhej do
             navigate('/'); 
             return;
         }
@@ -43,12 +41,12 @@ export default function Profile() {
         setLoading(false);
       }
     }
+
     fetchProfile();
-  }, [navigate]);
+  }, [user, navigate]); // Dependency me 'user' add kiya
 
   if (loading) return <div className="text-center p-10 text-xl font-bold text-gray-500">Loading Profile...</div>;
   
-  // Agar data load nahi hua to ye dikhao
   if (!profileData) return (
     <div className="text-center p-10">
         <p className="text-red-500 mb-4">Unable to load profile.</p>
@@ -83,6 +81,7 @@ export default function Profile() {
         {/* 🍲 MY RECIPES GRID */}
         <div className="flex items-center justify-between mb-6 border-b pb-4">
             <h2 className="text-2xl font-bold text-gray-800">My Cookbook 📖</h2>
+            {/* Upload link direct home page par le jayega jaha upload modal khulega */}
             <Link to="/" className="text-orange-600 hover:text-orange-700 font-medium">
                 + Upload New Recipe
             </Link>
