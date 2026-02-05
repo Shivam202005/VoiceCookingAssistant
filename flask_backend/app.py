@@ -3,16 +3,15 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from flask_bcrypt import Bcrypt
 from flask_migrate import Migrate
 from flask_cors import CORS
-from models import db, User, Recipe
+from models import db, User, Recipe, Like, Comment
 import os
 from dotenv import load_dotenv
 import google.generativeai as genai
 import traceback 
 from werkzeug.utils import secure_filename
-import json # JSON parsing ke liye
-import uuid # Unique filename banane ke liye
-# Upar import line me Like aur Comment add karo
-from models import db, User, Recipe, Like, Comment
+import json 
+import uuid 
+
 # Environment variables load karo
 load_dotenv()
 
@@ -24,8 +23,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # 🔥 FILE UPLOAD CONFIGURATION
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # 🔥 SESSION COOKIE SETTINGS
@@ -44,9 +41,9 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Using the stable free tier model
+        # ✅ FINAL FIX: 'gemini-flash-latest' use kar rahe hain (Free Tier Compatible)
         model = genai.GenerativeModel('gemini-flash-latest')
-        print("✅ Gemini AI Connected Successfully!")
+        print("✅ Gemini AI Connected Successfully! (Model: gemini-flash-latest)")
     except Exception as e:
         print(f"❌ Gemini Connection Failed: {e}")
 else:
@@ -79,21 +76,43 @@ def ask_ai():
 
         data = request.json
         question = data.get('question', '')
-        context = data.get('context', {})
+        context = data.get('context', {}) # Recipe Data
         
         print(f"🗣️ User Question: {question}")
         
-        # Prepare Context
-        title = context.get('title', 'Dish')
-        ingredients = ", ".join(context.get('ingredients', []))
-        steps = " ".join([f"Step {i+1}: {s}" for i, s in enumerate(context.get('steps', []))])
+        # ✅ ROBUST DATA HANDLING (Crash rokne ke liye)
+        
+        # 1. Ingredients Cleaning
+        raw_ing = context.get('ingredients', [])
+        clean_ing = []
+        for i in raw_ing:
+            if isinstance(i, dict):
+                text = i.get('original', '') or i.get('name', '') or str(i)
+                clean_ing.append(text)
+            else:
+                clean_ing.append(str(i))
+        
+        ingredients_str = ", ".join(clean_ing)
+
+        # 2. Steps Cleaning
+        raw_steps = context.get('steps', [])
+        clean_steps = []
+        for i, s in enumerate(raw_steps):
+            step_text = ""
+            if isinstance(s, dict):
+                step_text = s.get('step', '') or str(s)
+            else:
+                step_text = str(s)
+            clean_steps.append(f"Step {i+1}: {step_text}")
+        
+        steps_str = " ".join(clean_steps)
 
         # Prompt
         prompt = f"""
         You are 'CookBuddy', an AI Chef.
-        Recipe: {title}
-        Ingredients: {ingredients}
-        Steps: {steps}
+        Recipe: {context.get('title', 'Dish')}
+        Ingredients: {ingredients_str}
+        Steps: {steps_str}
         
         User Question: "{question}"
         
@@ -115,17 +134,18 @@ def ask_ai():
 
     except Exception as e:
         print(f"❌ CRITICAL AI ERROR: {e}")
-        traceback.print_exc()
+        traceback.print_exc() 
         return jsonify({'answer': "My brain is having trouble right now."}), 500
 
-# 1. GET ALL RECIPES
 @app.route('/recipes')
 def recipes():
-    # try-except hata diya taaki asli error dikhe agar koi ho
-    recipes = Recipe.query.all()
-    return jsonify([r.to_dict() for r in recipes])
+    try:
+        recipes = Recipe.query.all()
+        return jsonify([r.to_dict() for r in recipes])
+    except Exception as e:
+        print(f"Recipe Fetch Error: {e}")
+        return jsonify([])
 
-# 2. GET SINGLE RECIPE
 @app.route("/recipe/<int:recipe_id>")
 def get_recipe(recipe_id):
     try:
@@ -136,7 +156,6 @@ def get_recipe(recipe_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# 3. SEARCH RECIPES
 @app.route('/search')
 def search_recipes():
     query = request.args.get('q', '')
@@ -149,7 +168,6 @@ def search_recipes():
     except:
         return jsonify([])
 
-# 4. STATS
 @app.route('/stats')
 def stats():
     try:
@@ -157,8 +175,6 @@ def stats():
         return jsonify({'total_recipes': count, 'status': 'online'})
     except:
         return jsonify({'total_recipes': 0, 'status': 'db_error'})
-
-# --- AUTH ROUTES ---
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -208,64 +224,41 @@ def profile(user_id):
 @login_required
 def my_profile():
     try:
-        # 1. User ki recipes nikalo
         my_recipes = Recipe.query.filter_by(author_id=current_user.id).all()
-        
-        # 2. Response banao
         return jsonify({
-            'user': {
-                'name': current_user.name,
-                'email': current_user.email,
-                'id': current_user.id
-            },
-            'stats': {
-                'total_recipes': len(my_recipes)
-            },
+            'user': {'name': current_user.name, 'email': current_user.email, 'id': current_user.id},
+            'stats': {'total_recipes': len(my_recipes)},
             'recipes': [r.to_dict() for r in my_recipes]
         })
     except Exception as e:
         print(e)
         return jsonify({'error': 'Something went wrong'}), 500
 
-# --- 🔥 NEW UPLOAD ROUTE (HANDLES FILE UPLOAD) ---
 @app.route('/recipes/upload', methods=['POST'])
 @login_required
 def upload_recipe():
     try:
         print("📝 Upload Request Received...")
-        
-        # Note: 'request.form' use karenge kyunki FormData aa raha hai
         title = request.form.get('title')
         description = request.form.get('description')
         cook_time = request.form.get('cookTime')
         servings = request.form.get('servings')
-        
-        # JSON Strings ko wapas Python List banayenge
         ingredients = json.loads(request.form.get('ingredients'))
         steps = json.loads(request.form.get('steps'))
-        
         is_paid = request.form.get('is_paid') == 'true'
         tag = 'PREMIUM' if is_paid else 'FREE'
 
         image_url = ''
-
-        # 📸 FILE SAVE LOGIC
         if 'image' in request.files:
             file = request.files['image']
             if file.filename != '':
                 filename = secure_filename(file.filename)
-                # Unique filename taaki overwrite na ho
                 unique_filename = f"{uuid.uuid4().hex}_{filename}"
-                
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                 file.save(file_path)
-                
-                # Image URL generate karo (Server address ke saath)
-                # Note: Production me domain name use hoga, abhi localhost
                 image_url = f"http://127.0.0.1:5000/static/uploads/{unique_filename}"
                 print(f"📸 Image Saved at: {image_url}")
 
-        # Agar file nahi di, aur user ne URL diya hai
         if not image_url:
             image_url = request.form.get('image_url') or ''
 
@@ -285,7 +278,6 @@ def upload_recipe():
         
         db.session.add(new_recipe)
         db.session.commit()
-        print("✅ Recipe Saved to DB!")
         return jsonify({'message': 'Recipe uploaded successfully!', 'recipe': new_recipe.to_dict()}), 201
 
     except Exception as e:
@@ -294,19 +286,12 @@ def upload_recipe():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# Create Tables
-with app.app_context():
-    db.create_all()
-
-# --- ❤️ LIKE & COMMENT ROUTES ---
-
+# Like & Comment Routes
 @app.route('/recipe/<int:recipe_id>/like', methods=['POST'])
 @login_required
 def toggle_like(recipe_id):
     try:
-        # Check if already liked
         existing_like = Like.query.filter_by(user_id=current_user.id, recipe_id=recipe_id).first()
-        
         if existing_like:
             db.session.delete(existing_like)
             action = 'unliked'
@@ -314,10 +299,7 @@ def toggle_like(recipe_id):
             new_like = Like(user_id=current_user.id, recipe_id=recipe_id)
             db.session.add(new_like)
             action = 'liked'
-            
         db.session.commit()
-        
-        # Return updated count
         recipe = db.session.get(Recipe, recipe_id)
         return jsonify({'message': f'Recipe {action}', 'likes_count': recipe.likes.count()})
     except Exception as e:
@@ -329,14 +311,11 @@ def add_comment(recipe_id):
     try:
         data = request.json
         text = data.get('text')
-        
         if not text:
             return jsonify({'error': 'Comment cannot be empty'}), 400
-            
         new_comment = Comment(text=text, user_id=current_user.id, recipe_id=recipe_id)
         db.session.add(new_comment)
         db.session.commit()
-        
         return jsonify({
             'message': 'Comment added',
             'comment': {
@@ -349,12 +328,14 @@ def add_comment(recipe_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Helper to check if current user liked a recipe
 @app.route('/recipe/<int:recipe_id>/is_liked')
 @login_required
 def is_liked(recipe_id):
     liked = Like.query.filter_by(user_id=current_user.id, recipe_id=recipe_id).first() is not None
     return jsonify({'is_liked': liked})
+
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     print("🚀 Server Started on Port 5000")
