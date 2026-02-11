@@ -37,6 +37,10 @@ class User(db.Model, UserMixin):
 
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    
+    # 👇 NEW COLUMN ADDED (Spoonacular ID store karne ke liye)
+    spoonacular_id = db.Column(db.Integer, unique=True, nullable=True)
+    
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     image_url = db.Column(db.String(300))
@@ -58,6 +62,7 @@ class Recipe(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'spoonacular_id': self.spoonacular_id, # Optional: Response me bhi bhej sakte hain
             'title': self.title,
             'description': self.description,
             'image_url': self.image_url,
@@ -68,9 +73,9 @@ class Recipe(db.Model):
             'ingredients': self.ingredients,
             'steps': self.steps,
             
-            # 👇 YAHAN THA MAIN FIX
-            'category': self.category, # Database column name
-            'tag': self.category,      # ✅ FIX: Frontend 'tag' maang raha hai, isliye copy kiya
+            # 👇 Frontend Fix (View All 0 issue ke liye)
+            'category': self.category, 
+            'tag': self.category,      
             
             'is_paid': self.is_paid,
             'author_id': self.author_id,

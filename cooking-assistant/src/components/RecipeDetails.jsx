@@ -15,7 +15,7 @@ export default function RecipeDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // 🔥 NEW STATES FOR LIKE & COMMENT
+  // Like & Comment States
   const [likes, setLikes] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [comments, setComments] = useState([]);
@@ -41,11 +41,9 @@ export default function RecipeDetails() {
         
         setRecipe(data);
         
-        // Initialize Likes & Comments
         setLikes(data.likes_count || 0);
         setComments(data.comments || []);
 
-        // Check if current user already liked this recipe
         if (user) {
             try {
                 const likeRes = await fetch(`${API_BASE_URL}/recipe/${id}/is_liked`);
@@ -97,7 +95,7 @@ export default function RecipeDetails() {
     });
   };
 
-  // Reading Loop
+  // 🔥 UPDATED READING LOOP (INGREDIENTS FIRST)
   const startVoiceReading = async (startIndex = 0) => {
     if (isReadingRef.current) return;
     
@@ -105,20 +103,38 @@ export default function RecipeDetails() {
     isReadingRef.current = true;
     
     try {
+        // 1. INGREDIENTS READING (Sirf tab jab shuru se start ho)
         if(startIndex === 0) {
-            await speak(`Starting ${recipe.title}. Let's cook!`);
+            await speak(`Starting ${recipe.title}. First, let's check the ingredients.`);
+            
+            // Ingredients Loop
+            for (let i = 0; i < recipe.ingredients.length; i++) {
+                if(!isReadingRef.current) break; // Agar user ne rok diya
+
+                const ing = recipe.ingredients[i];
+                // Object handling (wahi logic jo UI me lagaya tha)
+                const ingText = typeof ing === 'object' ? (ing.original || ing.name) : ing;
+                
+                await speak(ingText);
+                await new Promise(r => setTimeout(r, 600)); // Thoda pause har ingredient ke baad
+            }
+
+            if(isReadingRef.current) {
+                await speak("Now, let's start cooking. Here are the instructions.");
+            }
         } else {
             await speak(`Resuming from step ${startIndex + 1}.`);
         }
 
+        // 2. STEPS READING LOOP
         for (let i = startIndex; i < recipe.steps.length; i++) {
             if(!isReadingRef.current) break; 
 
             stepIndexRef.current = i;
             setCurrentStepIndex(i);
             
-            // Step object handling (just like ingredients)
-            const stepText = typeof recipe.steps[i] === 'object' ? recipe.steps[i].step || JSON.stringify(recipe.steps[i]) : recipe.steps[i];
+            const stepText = typeof recipe.steps[i] === 'object' ? recipe.steps[i].step || "Follow instruction." : recipe.steps[i];
+            
             await speak(`Step ${i+1}. ${stepText}`);
             await new Promise(r => setTimeout(r, 1500));
         }
@@ -186,7 +202,7 @@ export default function RecipeDetails() {
     };
   };
 
-  // 🔥 HANDLE LIKE
+  // Handle Like
   const handleLike = async () => {
     if (!user) return alert("Please login to like recipes!");
     
@@ -208,7 +224,7 @@ export default function RecipeDetails() {
     }
   };
 
-  // 🔥 HANDLE COMMENT
+  // Handle Comment
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!user) return alert("Please login to comment!");
@@ -246,7 +262,7 @@ export default function RecipeDetails() {
                 {aiThinking ? '🤖 Chef AI is Thinking...' : '🤖 AI Kitchen Assistant'}
             </h2>
             <p className="text-gray-600 mb-6 min-h-[3rem] font-medium text-lg flex items-center justify-center">
-                {currentText || (isReading ? `Reading Step ${currentStepIndex + 1}...` : "I am ready! Click 'Read Recipe' or 'Ask AI'.")}
+                {currentText || (isReading ? `Reading...` : "I am ready! Click 'Read Recipe' or 'Ask AI'.")}
             </p>
             <div className="flex justify-center gap-4">
                 <button onClick={handleAskAI} disabled={aiThinking} className="px-8 py-4 rounded-full font-bold text-lg shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 transition-transform flex items-center gap-2">
@@ -283,7 +299,6 @@ export default function RecipeDetails() {
                         {recipe.ingredients.map((ing, i) => (
                             <div key={i} className="flex items-center gap-2 text-gray-700">
                                 <span className="text-orange-500">•</span> 
-                                {/* ✅ ERROR FIX: Check karo ki ing object hai ya string */}
                                 {typeof ing === 'object' ? (ing.original || ing.name) : ing}
                             </div>
                         ))}
@@ -297,9 +312,8 @@ export default function RecipeDetails() {
                         {recipe.steps.map((step, i) => (
                             <div key={i} className={`p-6 rounded-xl border-l-4 transition-all duration-300 ${currentStepIndex === i ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                                 <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>Step {i+1}</h4>
-                                {/* ✅ ERROR FIX: Check karo ki step object hai ya string */}
                                 <p className="text-gray-700 leading-relaxed text-lg">
-                                    {typeof step === 'object' ? step.step || "Instruction missing" : step}
+                                    {typeof step === 'object' ? step.step || "Follow instruction." : step}
                                 </p>
                             </div>
                         ))}
