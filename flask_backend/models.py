@@ -18,7 +18,6 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
     
-    # User ka naam lane ke liye relationship
     user = db.relationship('User', backref='comments')
 
 class User(db.Model, UserMixin):
@@ -37,9 +36,7 @@ class User(db.Model, UserMixin):
 
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    
-    # 👇 NEW COLUMN ADDED (Spoonacular ID store karne ke liye)
-    spoonacular_id = db.Column(db.Integer, unique=True, nullable=True)
+    spoonacular_id = db.Column(db.Integer, unique=True, nullable=True) # Purana safety feature
     
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -52,32 +49,28 @@ class Recipe(db.Model):
     steps = db.Column(db.JSON)
     
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    category = db.Column(db.String(20), default='FREE') # FREE or PREMIUM
-    is_paid = db.Column(db.Boolean, default=False)
     
-    # Relationships
+    # 👇 NAYE COLUMNS REGIONAL FILTER KE LIYE
+    country = db.Column(db.String(50), default='India')
+    state = db.Column(db.String(50), nullable=True) 
+    
     likes = db.relationship('Like', backref='recipe', lazy='dynamic')
     comments = db.relationship('Comment', backref='recipe', lazy=True)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'spoonacular_id': self.spoonacular_id, # Optional: Response me bhi bhej sakte hain
             'title': self.title,
             'description': self.description,
             'image_url': self.image_url,
-            'cookTime': self.ready_in_minutes, # Frontend expects cookTime
+            'cookTime': self.ready_in_minutes,
             'ready_in_minutes': self.ready_in_minutes,
             'servings': self.servings,
             'difficulty': self.difficulty,
             'ingredients': self.ingredients,
             'steps': self.steps,
-            
-            # 👇 Frontend Fix (View All 0 issue ke liye)
-            'category': self.category, 
-            'tag': self.category,      
-            
-            'is_paid': self.is_paid,
+            'country': self.country,
+            'state': self.state,
             'author_id': self.author_id,
             'likes_count': self.likes.count(),
             'comments': [{
