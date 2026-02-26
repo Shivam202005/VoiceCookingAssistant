@@ -2,7 +2,7 @@ import React from "react";
 import { useAuth } from "../context/AuthContext"; 
 import { Link } from "react-router-dom"; 
 
-export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAuthClick }) {
+export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAuthClick, onShareClick }) {
   const { user, logout } = useAuth(); 
 
   const handleSearchChange = (e) => {
@@ -12,8 +12,10 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
   return (
     <nav className="flex items-center justify-between p-4 bg-white shadow sticky top-0 z-40">
       <div className="flex items-center space-x-2">
-        <span className="text-orange-700 font-extrabold text-xl">🍳</span>
-        <span className="text-lg font-bold">CookBuddy</span>
+        <Link to="/" className="flex items-center space-x-2">
+          <span className="text-orange-700 font-extrabold text-xl">🍳</span>
+          <span className="text-lg font-bold text-gray-800">CookBuddy</span>
+        </Link>
       </div>
 
       <form className="flex-1 mx-4 md:mx-8 max-w-xl" onSubmit={(e) => e.preventDefault()}>
@@ -28,16 +30,24 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
         </div>
       </form>
 
-      <div className="flex gap-2 md:gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         <button
-          onClick={onAskAIClick} // 🔥 YAHAN FIX KIYA HAI (onVoiceSearch -> onAskAIClick)
-          className="bg-orange-100 text-orange-700 px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-200 transition-colors flex items-center gap-2"
+          onClick={onAskAIClick} 
+          className="bg-purple-100 text-purple-700 px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-purple-200 transition-colors flex items-center gap-2"
         >
-          Ask AI
+          🎤 Ask AI
         </button>
 
         {user ? (
           <div className="flex items-center gap-3">
+            {/* 🔥 UPLOAD RECIPE BUTTON IS BACK! */}
+            <button
+              onClick={onShareClick}
+              className="bg-green-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-green-600 shadow-md transition-transform hover:scale-105 flex items-center gap-2"
+            >
+              ➕ Upload
+            </button>
+
             <Link to="/profile" className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 px-4 py-2 rounded-full font-bold transition-colors">
               👤 {user.name}
             </Link>            
@@ -50,8 +60,8 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
           </div>
         ) : (
           <button
-            onClick={onAuthClick} // 🔥 YAHAN FIX KIYA HAI (onOpenAuth -> onAuthClick)
-            className="bg-orange-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-600 transition-colors"
+            onClick={onAuthClick} 
+            className="bg-orange-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-600 shadow-md transition-colors"
           >
             Sign Up
           </button>

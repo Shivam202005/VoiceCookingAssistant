@@ -260,13 +260,17 @@ def upload_recipe():
     try:
         print("📝 Upload Request Received...")
         title = request.form.get('title')
-        description = request.form.get('description')
-        cook_time = request.form.get('cookTime')
-        servings = request.form.get('servings')
-        ingredients = json.loads(request.form.get('ingredients'))
-        steps = json.loads(request.form.get('steps'))
-        is_paid = request.form.get('is_paid') == 'true'
-        tag = 'PREMIUM' if is_paid else 'FREE'
+        description = request.form.get('description', 'A deliciously authentic home-cooked recipe.')
+        cook_time = request.form.get('cookTime', 30)
+        servings = request.form.get('servings', 2)
+        
+        # Parse JSON lists safely
+        try:
+            ingredients = json.loads(request.form.get('ingredients', '[]'))
+            steps = json.loads(request.form.get('steps', '[]'))
+        except:
+            ingredients = []
+            steps = []
 
         image_url = ''
         if 'image' in request.files:
@@ -282,6 +286,7 @@ def upload_recipe():
         if not image_url:
             image_url = request.form.get('image_url') or ''
 
+        # 🔥 NEW CLEAN RECIPE OBJECT (Without is_paid and category)
         new_recipe = Recipe(
             title=title,
             description=description,
@@ -292,8 +297,8 @@ def upload_recipe():
             ingredients=ingredients,
             steps=steps,
             author_id=current_user.id,
-            category=tag,
-            is_paid=is_paid
+            country="India", # Default
+            state="All"      # Default
         )
         
         db.session.add(new_recipe)
