@@ -30,7 +30,6 @@ export default function RecipeDetails() {
   const isReadingRef = useRef(false);
   const stepIndexRef = useRef(0);
 
-  // Fetch Recipe Data
   useEffect(() => {
     async function fetchRecipe() {
       try {
@@ -40,7 +39,6 @@ export default function RecipeDetails() {
         const data = await response.json();
         
         setRecipe(data);
-        
         setLikes(data.likes_count || 0);
         setComments(data.comments || []);
 
@@ -65,7 +63,6 @@ export default function RecipeDetails() {
     if (id) fetchRecipe();
   }, [id, user]);
 
-  // Auto-Start Voice Logic
   useEffect(() => {
     if (recipe && isAutoVoiceMode && !isReadingRef.current) {
         setTimeout(() => {
@@ -74,7 +71,6 @@ export default function RecipeDetails() {
     }
   }, [recipe, isAutoVoiceMode]);
 
-  // TTS Helper
   const speak = (text) => {
     return new Promise((resolve) => {
       speechSynthesis.cancel();
@@ -95,7 +91,6 @@ export default function RecipeDetails() {
     });
   };
 
-  // 🔥 UPDATED READING LOOP (INGREDIENTS FIRST)
   const startVoiceReading = async (startIndex = 0) => {
     if (isReadingRef.current) return;
     
@@ -103,22 +98,15 @@ export default function RecipeDetails() {
     isReadingRef.current = true;
     
     try {
-        // 1. INGREDIENTS READING (Sirf tab jab shuru se start ho)
         if(startIndex === 0) {
             await speak(`Starting ${recipe.title}. First, let's check the ingredients.`);
-            
-            // Ingredients Loop
             for (let i = 0; i < recipe.ingredients.length; i++) {
-                if(!isReadingRef.current) break; // Agar user ne rok diya
-
+                if(!isReadingRef.current) break; 
                 const ing = recipe.ingredients[i];
-                // Object handling (wahi logic jo UI me lagaya tha)
                 const ingText = typeof ing === 'object' ? (ing.original || ing.name) : ing;
-                
                 await speak(ingText);
-                await new Promise(r => setTimeout(r, 600)); // Thoda pause har ingredient ke baad
+                await new Promise(r => setTimeout(r, 600)); 
             }
-
             if(isReadingRef.current) {
                 await speak("Now, let's start cooking. Here are the instructions.");
             }
@@ -126,15 +114,11 @@ export default function RecipeDetails() {
             await speak(`Resuming from step ${startIndex + 1}.`);
         }
 
-        // 2. STEPS READING LOOP
         for (let i = startIndex; i < recipe.steps.length; i++) {
             if(!isReadingRef.current) break; 
-
             stepIndexRef.current = i;
             setCurrentStepIndex(i);
-            
             const stepText = typeof recipe.steps[i] === 'object' ? recipe.steps[i].step || "Follow instruction." : recipe.steps[i];
-            
             await speak(`Step ${i+1}. ${stepText}`);
             await new Promise(r => setTimeout(r, 1500));
         }
@@ -156,10 +140,8 @@ export default function RecipeDetails() {
     setCurrentText("");
   };
 
-  // Ask AI
   const handleAskAI = () => {
     stopReading(); 
-    
     const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
     recognition.lang = 'en-US';
     recognition.start();
@@ -180,16 +162,12 @@ export default function RecipeDetails() {
                     context: recipe
                 })
             });
-
             const data = await res.json();
             setAiThinking(false);
-            
             await speak(data.answer);
-
             setTimeout(() => {
                 startVoiceReading(stepIndexRef.current);
             }, 500);
-
         } catch (err) {
             setAiThinking(false);
             speak("Sorry, connection error.");
@@ -202,7 +180,6 @@ export default function RecipeDetails() {
     };
   };
 
-  // Handle Like
   const handleLike = async () => {
     if (!user) return alert("Please login to like recipes!");
     
@@ -224,7 +201,6 @@ export default function RecipeDetails() {
     }
   };
 
-  // Handle Comment
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!user) return alert("Please login to comment!");
@@ -236,7 +212,6 @@ export default function RecipeDetails() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: newComment })
         });
-        
         if (res.ok) {
             const data = await res.json();
             setComments([...comments, data.comment]);
@@ -251,12 +226,36 @@ export default function RecipeDetails() {
   if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
   if (!recipe) return null;
 
+  // 🔥 THE SMART IMAGE FIX FOR RECIPE DETAILS PAGE
+  const indianImages = [
+    "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1589302168068-964664d93cb0?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop"
+  ];
+  const foreignImages = [
+    "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&auto=format&fit=crop"
+  ];
+
+  let displayImage = recipe.image_url || recipe.img || "";
+  if (!displayImage || !displayImage.startsWith("http") || displayImage.includes("placeholder") || displayImage.includes("f1.jpeg") || displayImage === "undefined") {
+    if (recipe.country === "Foreign") {
+      displayImage = foreignImages[(recipe.id || 0) % foreignImages.length];
+    } else {
+      displayImage = indianImages[(recipe.id || 0) % indianImages.length];
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <Link to="/" className="text-green-600 font-bold mb-4 inline-block hover:underline">← Back to Recipes</Link>
 
-        {/* 🧠 AI CONTROL CENTER */}
+        {/* AI CONTROL CENTER */}
         <div className={`p-6 rounded-2xl shadow-xl border-2 mb-8 text-center relative overflow-hidden transition-all duration-300 ${aiThinking ? 'bg-orange-50 border-orange-400' : 'bg-white border-blue-100'}`}>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">
                 {aiThinking ? '🤖 Chef AI is Thinking...' : '🤖 AI Kitchen Assistant'}
@@ -282,7 +281,8 @@ export default function RecipeDetails() {
 
         {/* Recipe Content */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <img src={recipe.image_url || recipe.img} alt={recipe.title} className="w-full h-72 object-cover"/>
+            {/* 🔥 Yahan displayImage use kar rahe hain */}
+            <img src={displayImage} alt={recipe.title} className="w-full h-72 object-cover"/>
             <div className="p-8">
                 <div className="flex justify-between items-start">
                     <h1 className="text-4xl font-extrabold mb-6 text-gray-800 flex-1">{recipe.title}</h1>
@@ -324,7 +324,6 @@ export default function RecipeDetails() {
 
         {/* LIKE & COMMENT SECTION */}
         <div className="bg-white rounded-2xl shadow-lg mt-8 p-8 border border-gray-100">
-            {/* Like Action */}
             <div className="flex items-center gap-4 mb-8 border-b pb-6">
                 <button 
                     onClick={handleLike}
@@ -341,7 +340,6 @@ export default function RecipeDetails() {
                 </span>
             </div>
 
-            {/* Comments Area */}
             <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
                 💬 Comments <span className="text-gray-400 text-lg font-normal">({comments.length})</span>
             </h3>
@@ -369,7 +367,6 @@ export default function RecipeDetails() {
                 )}
             </div>
 
-            {/* Add Comment Form */}
             {user ? (
                 <form onSubmit={handleCommentSubmit} className="flex gap-3">
                     <input 

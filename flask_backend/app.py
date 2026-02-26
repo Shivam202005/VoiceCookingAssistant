@@ -41,7 +41,6 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # ✅ FINAL FIX: 'gemini-flash-latest' use kar rahe hain (Free Tier Compatible)
         model = genai.GenerativeModel('gemini-flash-latest')
         print("✅ Gemini AI Connected Successfully! (Model: gemini-flash-latest)")
     except Exception as e:
@@ -79,8 +78,6 @@ def ask_ai():
         context = data.get('context', {}) # Recipe Data
         
         print(f"🗣️ User Question: {question}")
-        
-        # ✅ ROBUST DATA HANDLING (Crash rokne ke liye)
         
         # 1. Ingredients Cleaning
         raw_ing = context.get('ingredients', [])
@@ -141,7 +138,15 @@ def ask_ai():
 def recipes():
     try:
         recipes = Recipe.query.all()
-        return jsonify([r.to_dict() for r in recipes])
+        result = []
+        for r in recipes:
+            recipe_data = r.to_dict()
+            try:
+                recipe_data['likes_count'] = r.likes.count() if hasattr(r.likes, 'count') else len(r.likes)
+            except:
+                recipe_data['likes_count'] = 0
+            result.append(recipe_data)
+        return jsonify(result)
     except Exception as e:
         print(f"Recipe Fetch Error: {e}")
         return jsonify([])
@@ -151,7 +156,12 @@ def get_recipe(recipe_id):
     try:
         recipe = db.session.get(Recipe, recipe_id)
         if recipe:
-            return jsonify(recipe.to_dict())
+            recipe_data = recipe.to_dict()
+            try:
+                recipe_data['likes_count'] = recipe.likes.count()
+            except:
+                recipe_data['likes_count'] = 0
+            return jsonify(recipe_data)
         return jsonify({'error': 'Recipe not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -164,7 +174,17 @@ def search_recipes():
             Recipe.title.ilike(f'%{query}%') | 
             Recipe.description.ilike(f'%{query}%')
         ).limit(20).all()
-        return jsonify([r.to_dict() for r in recipes])
+        
+        result = []
+        for r in recipes:
+            recipe_data = r.to_dict()
+            try:
+                recipe_data['likes_count'] = r.likes.count() if hasattr(r.likes, 'count') else len(r.likes)
+            except:
+                recipe_data['likes_count'] = 0
+            result.append(recipe_data)
+            
+        return jsonify(result)
     except:
         return jsonify([])
 

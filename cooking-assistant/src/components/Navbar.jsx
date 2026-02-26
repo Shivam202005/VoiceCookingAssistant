@@ -1,9 +1,9 @@
 import React from "react";
-import { useAuth } from "../context/AuthContext"; // Auth context import karo
+import { useAuth } from "../context/AuthContext"; 
 import { Link } from "react-router-dom"; 
-// onOpenAuth prop receive karo
-export default function Navbar({ searchQuery, setSearchQuery, onVoiceSearch, onOpenAuth }) {
-  const { user, logout } = useAuth(); // User login hai ya nahi check karo
+
+export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAuthClick }) {
+  const { user, logout } = useAuth(); 
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -25,25 +25,23 @@ export default function Navbar({ searchQuery, setSearchQuery, onVoiceSearch, onO
             onChange={handleSearchChange}
             className="w-full py-2 px-4 pr-10 rounded-full bg-gray-100 text-gray-600 border focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-white transition-all duration-200"
           />
-          {/* SVG Icon same rahega */}
         </div>
       </form>
 
       <div className="flex gap-2 md:gap-3">
         <button
-          onClick={onVoiceSearch}
+          onClick={onAskAIClick} // 🔥 YAHAN FIX KIYA HAI (onVoiceSearch -> onAskAIClick)
           className="bg-orange-100 text-orange-700 px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-200 transition-colors flex items-center gap-2"
         >
-          {/* SVG same rahega */}
           Ask AI
         </button>
 
-        {/* 👇 LOGIC CHANGE: Agar user login hai to Logout dikhao, nahi to Sign Up */}
         {user ? (
           <div className="flex items-center gap-3">
             <Link to="/profile" className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 px-4 py-2 rounded-full font-bold transition-colors">
               👤 {user.name}
-            </Link>            <button
+            </Link>            
+            <button
               onClick={logout}
               className="bg-gray-200 text-gray-700 px-3 md:px-5 py-2 rounded-full font-semibold hover:bg-gray-300"
             >
@@ -52,7 +50,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onVoiceSearch, onO
           </div>
         ) : (
           <button
-            onClick={onOpenAuth} // 👇 Ye button ab modal kholega
+            onClick={onAuthClick} // 🔥 YAHAN FIX KIYA HAI (onOpenAuth -> onAuthClick)
             className="bg-orange-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-600 transition-colors"
           >
             Sign Up
