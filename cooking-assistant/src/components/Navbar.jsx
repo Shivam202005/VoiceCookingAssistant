@@ -1,14 +1,9 @@
 import React from "react";
 import { useAuth } from "../context/AuthContext"; 
 import { Link } from "react-router-dom"; 
-import { useLanguage } from "../context/LanguageContext";
-import translations from "../data/translations";
-import LanguageSelector from "./LanguageSelector";
 
 export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAuthClick, onShareClick }) {
   const { user, logout } = useAuth(); 
-  const { language } = useLanguage();
-  const t = translations[language];
 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -19,7 +14,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
       <div className="flex items-center space-x-2">
         <Link to="/" className="flex items-center space-x-2">
           <span className="text-orange-700 font-extrabold text-xl">🍳</span>
-          <span className="text-lg font-bold text-gray-800">{t.brandName}</span>
+          <span className="text-lg font-bold text-gray-800">CookBuddy</span>
         </Link>
       </div>
 
@@ -27,7 +22,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
         <div className="relative">
           <input
             type="text"
-            placeholder={t.searchPlaceholder}
+            placeholder="Search for recipes..."
             value={searchQuery}
             onChange={handleSearchChange}
             className="w-full py-2 px-4 pr-10 rounded-full bg-gray-100 text-gray-600 border focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-white transition-all duration-200"
@@ -36,22 +31,21 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
       </form>
 
       <div className="flex items-center gap-2 md:gap-3">
-        <LanguageSelector />
-
         <button
           onClick={onAskAIClick} 
           className="bg-purple-100 text-purple-700 px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-purple-200 transition-colors flex items-center gap-2"
         >
-          🎤 {t.askAI}
+          🎤 Ask AI
         </button>
 
         {user ? (
           <div className="flex items-center gap-3">
+            {/* 🔥 UPLOAD RECIPE BUTTON IS BACK! */}
             <button
               onClick={onShareClick}
               className="bg-green-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-green-600 shadow-md transition-transform hover:scale-105 flex items-center gap-2"
             >
-              ➕ {t.upload}
+              ➕ Upload
             </button>
 
             <Link to="/profile" className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 px-4 py-2 rounded-full font-bold transition-colors">
@@ -61,7 +55,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
               onClick={logout}
               className="bg-gray-200 text-gray-700 px-3 md:px-5 py-2 rounded-full font-semibold hover:bg-gray-300"
             >
-              {t.logout}
+              Logout
             </button>
           </div>
         ) : (
@@ -69,7 +63,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAskAIClick, onAu
             onClick={onAuthClick} 
             className="bg-orange-500 text-white px-3 md:px-5 py-2 rounded-full font-semibold text-sm md:text-base hover:bg-orange-600 shadow-md transition-colors"
           >
-            {t.signUp}
+            Sign Up
           </button>
         )}
       </div>

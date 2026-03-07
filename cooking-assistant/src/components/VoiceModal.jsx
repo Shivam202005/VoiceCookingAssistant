@@ -1,24 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLanguage } from "../context/LanguageContext";
-import translations from "../data/translations";
 
 const API_BASE_URL = "/api";
 
-const LANG_CODES = { en: "en-US", hi: "hi-IN", mr: "mr-IN" };
-
-const YES_WORDS = ['yes', 'yeah', 'yep', 'ok', 'okay', 'sure', 'yah', 'ya', 'yas', 'yess', 'yees',
-  'haan', 'ha', 'han',  // Hindi
-  'ho', 'hoy',           // Marathi
-];
-const NO_WORDS = ['no', 'nope', 'nah', 'next', 'skip',
-  'nahi', 'naa', 'agla', // Hindi
-  'nako', 'pudha',       // Marathi
-];
-
 export default function VoiceModal({ isOpen, onClose }) {
-  const { language } = useLanguage();
-  const t = translations[language];
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -70,7 +55,7 @@ export default function VoiceModal({ isOpen, onClose }) {
       recognitionRef.current = new window.webkitSpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = LANG_CODES[language] || "en-US";
+      recognitionRef.current.lang = "en-US";
       recognitionRef.current.maxAlternatives = 5;
 
       recognitionRef.current.onresult = (event) => {
@@ -128,12 +113,6 @@ export default function VoiceModal({ isOpen, onClose }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.lang = LANG_CODES[language] || "en-US";
-    }
-  }, [language]);
-
   const resetState = () => {
     setSearchResults([]);
     setCurrentRecipeIndex(0);
@@ -164,10 +143,11 @@ export default function VoiceModal({ isOpen, onClose }) {
   };
 
   const isYesCommand = (text, alternatives = []) => {
+    const yesWords = ['yes', 'yeah', 'yep', 'ok', 'okay', 'sure', 'yah', 'ya', 'yas', 'yess', 'yees'];
     const allTexts = [text, ...alternatives];
     
     for (const t of allTexts) {
-      for (const yesWord of YES_WORDS) {
+      for (const yesWord of yesWords) {
         if (t.includes(yesWord) || yesWord.includes(t.replace(/[^a-z]/g, ''))) {
           console.log("✅ YES detected in:", t, "matching:", yesWord);
           return true;
@@ -178,10 +158,11 @@ export default function VoiceModal({ isOpen, onClose }) {
   };
 
   const isNoCommand = (text, alternatives = []) => {
+    const noWords = ['no', 'nope', 'nah', 'next', 'skip'];
     const allTexts = [text, ...alternatives];
     
     for (const t of allTexts) {
-      for (const noWord of NO_WORDS) {
+      for (const noWord of noWords) {
         if (t.includes(noWord) || noWord.includes(t.replace(/[^a-z]/g, ''))) {
           console.log("❌ NO/NEXT detected in:", t, "matching:", noWord);
           return true;
@@ -210,17 +191,14 @@ export default function VoiceModal({ isOpen, onClose }) {
         utterance.rate = 0.9;
         utterance.pitch = 1.1;
         utterance.volume = 1;
-        utterance.lang = LANG_CODES[language] || "en-US";
         
         const voices = speechSynthesis.getVoices();
-        const langCode = LANG_CODES[language] || "en-US";
-        const matchedVoice =
-          voices.find(v => v.lang === langCode) ||
-          voices.find(v => v.lang.startsWith(langCode.split("-")[0])) ||
-          voices.find(v => v.name.includes('Google') && v.name.includes('Female'));
+        const googleVoice = voices.find(v => 
+          v.name.includes('Google') && v.name.includes('Female')
+        );
         
-        if (matchedVoice) {
-          utterance.voice = matchedVoice;
+        if (googleVoice) {
+          utterance.voice = googleVoice;
         }
         
         utterance.onstart = () => {
@@ -306,7 +284,7 @@ export default function VoiceModal({ isOpen, onClose }) {
           console.log("🚀 Recipe confirmed, navigating to ID:", recipe.id);
           
           // Speak first, then navigate
-          await speak(t.voiceConfirm, false);
+          await speak("Perfect! Opening your recipe with automatic voice cooking guide. Get ready to cook!", false);
           
           // Thoda delay taaki user sun sake
           setTimeout(() => {
@@ -321,7 +299,7 @@ export default function VoiceModal({ isOpen, onClose }) {
           
         } else {
           console.log("❌ Recipe data missing from ref");
-          await speak(t.voiceNoRecipe);
+          await speak("Sorry, recipe information is missing. Let's search again.");
         }
         
       } else if (isNoCommand(text, alternatives)) {
@@ -357,14 +335,14 @@ export default function VoiceModal({ isOpen, onClose }) {
       
       console.log("✅ Showing recipe 1 of", results.length, ":", recipe.title, "| ID:", recipe.id);
       
-      const message = t.voiceFound(recipe.title, recipe.cookTime, recipe.servings);
+      const message = `Found ${recipe.title}. This recipe takes ${recipe.cookTime} and serves ${recipe.servings} people. Say YES to see this recipe in detail, or say NO or NEXT for other options.`;
       await speak(message);
       
     } else {
       console.log("❌ No recipes found for:", query);
       setWaitingForConfirmation(false);
       waitingForConfirmationRef.current = false;
-      await speak(t.voiceNotFound);
+      await speak("Sorry, no recipes found. Try saying soup, pasta, pizza, or another dish name.");
     }
   };
 
@@ -383,7 +361,7 @@ export default function VoiceModal({ isOpen, onClose }) {
       
       console.log("✅ Showing recipe", nextIndex + 1, "of", totalResults, ":", recipe.title, "| ID:", recipe.id);
       
-      const message = t.voiceOption(nextIndex + 1, recipe.title, recipe.cookTime, recipe.servings);
+      const message = `Here's option ${nextIndex + 1}: ${recipe.title}. This takes ${recipe.cookTime} and serves ${recipe.servings} people. Say YES to see this recipe, or NO or NEXT for more options.`;
       await speak(message);
       
     } else {
@@ -393,12 +371,12 @@ export default function VoiceModal({ isOpen, onClose }) {
       setSearchResults([]);
       searchResultsRef.current = [];
       currentRecipeRef.current = null;
-      await speak(t.voiceNoMore);
+      await speak("No more recipe options available. Say a different dish name like chicken, pasta, or pizza.");
     }
   };
 
   const startInitialFlow = async () => {
-    await speak(t.voiceGreeting);
+    await speak("Hi! Say a recipe name like chicken, pasta, or pizza to get started.");
   };
 
   const handleManualYes = () => {
@@ -421,7 +399,7 @@ export default function VoiceModal({ isOpen, onClose }) {
         </button>
 
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">{t.voiceModalTitle}</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">🎤 Voice Recipe Search</h2>
 
           {/* Status Circle */}
           <div className="mb-6">
@@ -437,25 +415,25 @@ export default function VoiceModal({ isOpen, onClose }) {
             </div>
             
             <p className="text-xl font-bold text-gray-700 mb-2">
-              {isSpeaking ? t.aiSpeaking :
-               isListening && !waitingForConfirmation ? t.sayRecipeName :
-               isListening && waitingForConfirmation ? t.sayYesNoNext :
-               waitingForConfirmation ? t.waitingYesNoNext :
-               t.waitingRecipeName}
+              {isSpeaking ? "🔊 AI Speaking..." :
+               isListening && !waitingForConfirmation ? "🎧 Say recipe name..." :
+               isListening && waitingForConfirmation ? "🎧 Say YES, NO or NEXT..." :
+               waitingForConfirmation ? "🎯 Say YES, NO or NEXT" :
+               "🎯 Say recipe name"}
             </p>
           </div>
 
           {/* Message Display */}
           <div className="mb-6 p-4 bg-blue-50 rounded-xl border-2 border-blue-200 min-h-[120px] flex items-center justify-center">
             <p className="text-blue-800 font-medium text-lg text-center">
-              {message || t.gettingReady}
+              {message || "Getting ready to listen..."}
             </p>
           </div>
 
           {/* User Input Display */}
           {transcript && (
             <div className="mb-4 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-              <p className="text-sm text-green-600">{t.youSaid}</p>
+              <p className="text-sm text-green-600">You said:</p>
               <p className="text-green-800 font-bold text-lg">"{transcript}"</p>
             </div>
           )}
@@ -464,7 +442,7 @@ export default function VoiceModal({ isOpen, onClose }) {
           {currentRecipe && (
             <div className="mb-6 p-5 bg-yellow-50 rounded-xl border-2 border-yellow-300 shadow-lg">
               <p className="text-sm text-yellow-600 font-medium mb-2">
-                {t.recipeOption} {currentRecipeIndex + 1} {t.of} {searchResults.length}:
+                🍽️ Recipe Option {currentRecipeIndex + 1} of {searchResults.length}:
               </p>
               <p className="text-yellow-800 font-bold text-xl mb-2">{currentRecipe.title}</p>
               <p className="text-yellow-600 text-sm mb-3">ID: {currentRecipe.id}</p>
@@ -496,7 +474,7 @@ export default function VoiceModal({ isOpen, onClose }) {
                 onClick={handleManualYes}
                 className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-bold text-sm"
               >
-                {t.manualYes}
+                🖱️ Manual YES
               </button>
             </div>
           )}
@@ -508,7 +486,7 @@ export default function VoiceModal({ isOpen, onClose }) {
               disabled={isListening || isSpeaking}
               className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white py-2 px-4 rounded-lg font-bold text-sm"
             >
-              {t.startListening}
+              🎤 Start Listening
             </button>
             
             {waitingForConfirmation && (
@@ -516,16 +494,16 @@ export default function VoiceModal({ isOpen, onClose }) {
                 onClick={() => showNextRecipe()}
                 className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm"
               >
-                {t.nextRecipe}
+                ➡️ Next Recipe
               </button>
             )}
           </div>
 
           <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded-lg mb-4">
-            <p><strong>{t.voiceTips}</strong></p>
-            <p>• {t.voiceTip1}</p>
-            <p>• {t.voiceTip2}</p>
-            <p>• {t.voiceTip3}</p>
+            <p><strong>💡 Voice Tips:</strong></p>
+            <p>• Speak clearly and loudly</p>
+            <p>• Try: "YES", "YEP" for confirmation</p>
+            <p>• Try: "NO", "NEXT" for other options</p>
           </div>
 
         </div>

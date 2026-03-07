@@ -1,19 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useLanguage } from "../context/LanguageContext";
-import translations from "../data/translations";
 
 const API_BASE_URL = "/api";
-
-const LANG_CODES = { en: "en-US", hi: "hi-IN", mr: "mr-IN" };
 
 export default function RecipeDetails() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { language } = useLanguage();
-  const t = translations[language];
   
   const isAutoVoiceMode = searchParams.get('voice') === 'true';
 
@@ -104,16 +98,10 @@ export default function RecipeDetails() {
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
-      utterance.lang = LANG_CODES[language] || "en-US";
       
       const voices = speechSynthesis.getVoices();
-      const langCode = LANG_CODES[language] || "en-US";
-      const matchedVoice =
-        voices.find(v => v.lang === langCode) ||
-        voices.find(v => v.lang.startsWith(langCode.split("-")[0])) ||
-        voices.find(v => v.name.includes('Google') && v.name.includes('Female')) ||
-        voices[0];
-      if (matchedVoice) utterance.voice = matchedVoice;
+      const googleVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female')) || voices[0];
+      if (googleVoice) utterance.voice = googleVoice;
 
       utterance.onend = () => {
         resolve();
@@ -131,7 +119,7 @@ export default function RecipeDetails() {
     
     try {
         if(startIndex === 0) {
-            await speak(t.voiceStarting(recipe.title));
+            await speak(`Starting ${recipe.title}. First, let's check the ingredients.`);
             for (let i = 0; i < recipe.ingredients.length; i++) {
                 if(!isReadingRef.current) break; 
                 const ing = recipe.ingredients[i];
@@ -140,10 +128,10 @@ export default function RecipeDetails() {
                 await new Promise(r => setTimeout(r, 600)); 
             }
             if(isReadingRef.current) {
-                await speak(t.voiceCookingNow);
+                await speak("Now, let's start cooking. Here are the instructions.");
             }
         } else {
-            await speak(t.voiceResuming(startIndex + 1));
+            await speak(`Resuming from step ${startIndex + 1}.`);
         }
 
         for (let i = startIndex; i < recipe.steps.length; i++) {
@@ -151,12 +139,12 @@ export default function RecipeDetails() {
             stepIndexRef.current = i;
             setCurrentStepIndex(i);
             const stepText = typeof recipe.steps[i] === 'object' ? recipe.steps[i].step || "Follow instruction." : recipe.steps[i];
-            await speak(t.voiceStep(i + 1, stepText));
+            await speak(`Step ${i+1}. ${stepText}`);
             await new Promise(r => setTimeout(r, 1500));
         }
 
         if(isReadingRef.current) {
-             await speak(t.voiceComplete);
+             await speak("Recipe complete! Enjoy your meal.");
              setIsReading(false);
              isReadingRef.current = false;
              stepIndexRef.current = 0;
@@ -175,10 +163,10 @@ export default function RecipeDetails() {
   const handleAskAI = () => {
     stopReading(); 
     const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
-    recognition.lang = LANG_CODES[language] || "en-US";
+    recognition.lang = 'en-US';
     recognition.start();
 
-    setCurrentText(t.aiListening);
+    setCurrentText("🎧 Listening... Ask me anything!");
 
     recognition.onresult = async (event) => {
         const question = event.results[0][0].transcript;
@@ -191,8 +179,7 @@ export default function RecipeDetails() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     question: question,
-                    context: recipe,
-                    language: language
+                    context: recipe
                 })
             });
             const data = await res.json();
@@ -203,13 +190,13 @@ export default function RecipeDetails() {
             }, 500);
         } catch (err) {
             setAiThinking(false);
-            speak(t.aiNoAnswer);
+            speak("Sorry, connection error.");
         }
     };
 
     recognition.onerror = () => {
         setAiThinking(false);
-        setCurrentText(t.aiDidntCatch);
+        setCurrentText("❌ Didn't catch that. Try again.");
     };
   };
 
@@ -255,7 +242,7 @@ export default function RecipeDetails() {
     }
   };
 
-  if (loading) return <div className="p-10 text-center text-xl">{t.loadingRecipe}</div>;
+  if (loading) return <div className="p-10 text-center text-xl">Loading your delicious recipe...</div>;
   if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
   if (!recipe) return null;
 
@@ -286,27 +273,27 @@ export default function RecipeDetails() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <Link to="/" className="text-green-600 font-bold mb-4 inline-block hover:underline">{t.backToRecipes}</Link>
+        <Link to="/" className="text-green-600 font-bold mb-4 inline-block hover:underline">← Back to Recipes</Link>
 
         {/* AI CONTROL CENTER */}
         <div className={`p-6 rounded-2xl shadow-xl border-2 mb-8 text-center relative overflow-hidden transition-all duration-300 ${aiThinking ? 'bg-orange-50 border-orange-400' : 'bg-white border-blue-100'}`}>
             <h2 className="text-2xl font-bold mb-2 text-gray-800">
-                {aiThinking ? t.aiThinking : t.aiAssistant}
+                {aiThinking ? '🤖 Chef AI is Thinking...' : '🤖 AI Kitchen Assistant'}
             </h2>
             <p className="text-gray-600 mb-6 min-h-[3rem] font-medium text-lg flex items-center justify-center">
-                {currentText || (isReading ? `Reading...` : t.aiReady)}
+                {currentText || (isReading ? `Reading...` : "I am ready! Click 'Read Recipe' or 'Ask AI'.")}
             </p>
             <div className="flex justify-center gap-4">
                 <button onClick={handleAskAI} disabled={aiThinking} className="px-8 py-4 rounded-full font-bold text-lg shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-105 transition-transform flex items-center gap-2">
-                    {aiThinking ? t.processing : t.askAIHelp}
+                    {aiThinking ? '⏳ Processing...' : '🎤 Ask AI Help'}
                 </button>
                 {!isReading ? (
                     <button onClick={() => startVoiceReading(stepIndexRef.current)} className="bg-green-500 hover:bg-green-600 text-white px-6 py-4 rounded-full font-bold shadow-lg">
-                        {stepIndexRef.current === 0 ? t.readRecipe : t.resumeRecipe}
+                        {stepIndexRef.current === 0 ? '▶️ Read Recipe' : '▶️ Resume Recipe'}
                     </button>
                 ) : (
                     <button onClick={stopReading} className="bg-red-500 hover:bg-red-600 text-white px-6 py-4 rounded-full font-bold shadow-lg">
-                        {t.pause}
+                        ⏸️ Pause
                     </button>
                 )}
             </div>
@@ -327,7 +314,7 @@ export default function RecipeDetails() {
                 
                 {/* Ingredients Grid */}
                 <div className="mb-8 p-6 bg-yellow-50 rounded-xl border border-yellow-100">
-                    <h3 className="text-2xl font-bold mb-4 text-yellow-800">🥕 {t.ingredients}</h3>
+                    <h3 className="text-2xl font-bold mb-4 text-yellow-800">🥕 Ingredients</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {recipe.ingredients.map((ing, i) => (
                             <div key={i} className="flex items-center gap-2 text-gray-700">
@@ -340,11 +327,11 @@ export default function RecipeDetails() {
 
                 {/* Steps List */}
                 <div>
-                    <h3 className="text-2xl font-bold mb-6 text-gray-800">👨‍🍳 {t.instructions}</h3>
+                    <h3 className="text-2xl font-bold mb-6 text-gray-800">👨‍🍳 Instructions</h3>
                     <div className="space-y-6">
                         {recipe.steps.map((step, i) => (
                             <div key={i} className={`p-6 rounded-xl border-l-4 transition-all duration-300 ${currentStepIndex === i ? 'bg-blue-50 border-blue-500 shadow-md transform scale-[1.02]' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                                <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>{t.step} {i+1}</h4>
+                                <h4 className={`font-bold text-lg mb-2 ${currentStepIndex === i ? 'text-blue-600' : 'text-gray-500'}`}>Step {i+1}</h4>
                                 <p className="text-gray-700 leading-relaxed text-lg">
                                     {typeof step === 'object' ? step.step || "Follow instruction." : step}
                                 </p>
@@ -366,21 +353,21 @@ export default function RecipeDetails() {
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
-                    {isLiked ? t.liked : t.likeRecipe}
+                    {isLiked ? '❤️ Liked' : '🤍 Like Recipe'} 
                 </button>
                 <span className="text-gray-500 text-sm">
-                    {isLiked ? t.youLovedThis : t.didYouLike}
+                    {isLiked ? 'You loved this!' : 'Did you like this recipe?'}
                 </span>
             </div>
 
             <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-                {t.comments} <span className="text-gray-400 text-lg font-normal">({comments.length})</span>
+                💬 Comments <span className="text-gray-400 text-lg font-normal">({comments.length})</span>
             </h3>
             
             <div className="space-y-4 mb-8 max-h-96 overflow-y-auto pr-2">
                 {comments.length === 0 ? (
                     <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                        <p className="text-gray-400 italic">{t.noComments}</p>
+                        <p className="text-gray-400 italic">No comments yet. Be the first to share your thoughts!</p>
                     </div>
                 ) : (
                     comments.map((comment) => (
@@ -406,16 +393,16 @@ export default function RecipeDetails() {
                         type="text" 
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
-                        placeholder={t.writeComment} 
+                        placeholder="Write a comment..." 
                         className="flex-1 p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-300 bg-gray-50 focus:bg-white transition-all"
                     />
                     <button type="submit" className="bg-orange-500 text-white px-8 py-4 rounded-xl font-bold hover:bg-orange-600 shadow-md transition-transform hover:scale-105">
-                        {t.post}
+                        Post
                     </button>
                 </form>
             ) : (
                 <div className="text-center p-4 bg-yellow-50 rounded-xl text-yellow-800 border border-yellow-200">
-                    <span className="font-bold">{t.loginToLike}</span>
+                    <span className="font-bold">🔒 Login</span> to like and comment on this recipe.
                 </div>
             )}
         </div>
