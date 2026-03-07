@@ -166,72 +166,7 @@ def get_recipe(recipe_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-<<<<<<< HEAD
-@app.route('/recipe/<int:recipe_id>/translate', methods=['POST'])
-def translate_recipe(recipe_id):
-    try:
-        data = request.json
-        language = data.get('language', 'en')
 
-        recipe = db.session.get(Recipe, recipe_id)
-        if not recipe:
-            return jsonify({'error': 'Recipe not found'}), 404
-
-        recipe_data = recipe.to_dict()
-
-        if language == 'en' or not GEMINI_API_KEY:
-            return jsonify(recipe_data)
-
-        lang_name = 'Hindi' if language == 'hi' else 'Marathi' if language == 'mr' else 'English'
-
-        ingredients_list = recipe_data.get('ingredients', [])
-        steps_list = recipe_data.get('steps', [])
-
-        prompt = f"""Translate the following recipe details to {lang_name}. Return ONLY a valid JSON object.
-Do NOT include any markdown tags like ```json or ```.
-Original:
-- Title: {recipe_data.get('title', '')}
-- Description: {recipe_data.get('description', '')}
-- Ingredients: {json.dumps(ingredients_list, ensure_ascii=False)}
-- Steps: {json.dumps(steps_list, ensure_ascii=False)}
-
-Return this exact JSON format:
-{{"title": "translated title", "description": "translated description", "ingredients": ["translated ingredient 1", "translated ingredient 2"], "steps": ["translated step 1", "translated step 2"]}}"""
-
-        print(f"🌐 Translating recipe '{recipe_data.get('title')}' to {lang_name}...")
-        response = model.generate_content(prompt)
-
-        if response.text:
-            clean_text = response.text.strip()
-            # Remove markdown code blocks if present
-            if clean_text.startswith('```'):
-                clean_text = clean_text.split('\n', 1)[1] if '\n' in clean_text else clean_text[3:]
-                clean_text = clean_text.rsplit('```', 1)[0]
-                clean_text = clean_text.strip()
-
-            translated = json.loads(clean_text)
-            recipe_data['title'] = translated.get('title', recipe_data['title'])
-            recipe_data['description'] = translated.get('description', recipe_data['description'])
-            recipe_data['ingredients'] = translated.get('ingredients', recipe_data['ingredients'])
-            recipe_data['steps'] = translated.get('steps', recipe_data['steps'])
-            print(f"✅ Translation successful: {recipe_data['title']}")
-
-        return jsonify(recipe_data)
-
-    except Exception as e:
-        print(f"❌ Translation error: {e}")
-        traceback.print_exc()
-        # Return untranslated recipe on error
-        try:
-            recipe = db.session.get(Recipe, recipe_id)
-            if recipe:
-                return jsonify(recipe.to_dict())
-        except Exception:
-            pass
-        return jsonify({'error': str(e)}), 500
-
-=======
->>>>>>> parent of f29152d (Fix multi-language voice search and add recipe translation)
 @app.route('/search')
 def search_recipes():
     query = request.args.get('q', '')
