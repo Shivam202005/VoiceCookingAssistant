@@ -280,7 +280,7 @@ export default function VoiceModal({ isOpen, onClose }) {
   const searchRecipes = async (query) => {
     try {
       console.log("🔍 Searching recipes for:", query);
-      const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}&lang=${language}`);
       const results = await response.json();
       console.log("✅ Found", results.length, "recipes");
       return results;
