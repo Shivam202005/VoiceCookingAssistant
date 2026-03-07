@@ -166,6 +166,7 @@ def get_recipe(recipe_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+<<<<<<< HEAD
 @app.route('/recipe/<int:recipe_id>/translate', methods=['POST'])
 def translate_recipe(recipe_id):
     try:
@@ -229,35 +230,16 @@ Return this exact JSON format:
             pass
         return jsonify({'error': str(e)}), 500
 
+=======
+>>>>>>> parent of f29152d (Fix multi-language voice search and add recipe translation)
 @app.route('/search')
 def search_recipes():
     query = request.args.get('q', '')
-    lang = request.args.get('lang', 'en')
     try:
-        search_query = query
-
-        # If non-English language, translate query to English for DB search
-        if lang != 'en' and GEMINI_API_KEY and query.strip():
-            try:
-                translate_prompt = f"Translate the following food/recipe search query to English. Return ONLY the English translation word(s), nothing else. No quotes, no explanation.\nQuery: {query}"
-                translate_response = model.generate_content(translate_prompt)
-                if translate_response.text:
-                    search_query = translate_response.text.strip().strip('"').strip("'").strip()
-                    print(f"🔄 Translated search query: '{query}' -> '{search_query}'")
-            except Exception as e:
-                print(f"⚠️ Translation failed, using original query: {e}")
-
         recipes = Recipe.query.filter(
-            Recipe.title.ilike(f'%{search_query}%') | 
-            Recipe.description.ilike(f'%{search_query}%')
+            Recipe.title.ilike(f'%{query}%') | 
+            Recipe.description.ilike(f'%{query}%')
         ).limit(20).all()
-
-        # If no results with translated query, try original query as fallback
-        if not recipes and search_query != query:
-            recipes = Recipe.query.filter(
-                Recipe.title.ilike(f'%{query}%') | 
-                Recipe.description.ilike(f'%{query}%')
-            ).limit(20).all()
         
         result = []
         for r in recipes:

@@ -37,28 +37,8 @@ export default function RecipeDetails() {
         const response = await fetch(`${API_BASE_URL}/recipe/${id}`);
         if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
         const data = await response.json();
-
-        // If language is not English, translate recipe details
-        if (language !== 'en') {
-          try {
-            const translateRes = await fetch(`${API_BASE_URL}/recipe/${id}/translate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ language })
-            });
-            if (translateRes.ok) {
-              const translatedData = await translateRes.json();
-              setRecipe(translatedData);
-            } else {
-              setRecipe(data);
-            }
-          } catch {
-            setRecipe(data);
-          }
-        } else {
-          setRecipe(data);
-        }
-
+        
+        setRecipe(data);
         setLikes(data.likes_count || 0);
         setComments(data.comments || []);
 
@@ -81,7 +61,7 @@ export default function RecipeDetails() {
       }
     }
     if (id) fetchRecipe();
-  }, [id, user, language]);
+  }, [id, user]);
 
   useEffect(() => {
     if (recipe && isAutoVoiceMode && !isReadingRef.current) {
