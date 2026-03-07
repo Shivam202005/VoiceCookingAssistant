@@ -234,7 +234,7 @@ Return this exact JSON format:
             recipe = db.session.get(Recipe, recipe_id)
             if recipe:
                 return jsonify(recipe.to_dict())
-        except:
+        except Exception:
             pass
         return jsonify({'error': str(e)}), 500
 
