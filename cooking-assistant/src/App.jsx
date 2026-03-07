@@ -7,6 +7,8 @@ import RecipeDetails from "./components/RecipeDetails";
 
 
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import translations from './data/translations';
 import AuthForm from './components/AuthForm';
 import ShareRecipeModal from './components/ShareRecipeModal';
 import Profile from "./components/Profile";
@@ -15,6 +17,8 @@ const API_BASE_URL = "/api";
 
 function Homepage() {
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const t = translations[language];
   const [showAuth, setShowAuth] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,7 +30,16 @@ function Homepage() {
   
   const [selectedCountry, setSelectedCountry] = useState("All");
   const [selectedState, setSelectedState] = useState("All");
-  const statesList = ["All", "Maharashtra", "Punjab", "Uttar Pradesh", "Bihar", "Tamil Nadu", "Rajasthan", "Gujarat"];
+  const statesList = [
+    { key: "All", label: t.stateAll },
+    { key: "Maharashtra", label: t.stateMaharashtra },
+    { key: "Punjab", label: t.statePunjab },
+    { key: "Uttar Pradesh", label: t.stateUP },
+    { key: "Bihar", label: t.stateBihar },
+    { key: "Tamil Nadu", label: t.stateTamilNadu },
+    { key: "Rajasthan", label: t.stateRajasthan },
+    { key: "Gujarat", label: t.stateGujarat },
+  ];
 
   useEffect(() => {
     fetchRecipes();
@@ -88,8 +101,8 @@ function Homepage() {
           alt="Delicious Food Background"
         />
         <div className="relative z-10 text-center px-4">
-          <h1 className="text-5xl font-black mb-4 drop-shadow-2xl">Discover Global & Regional Flavors</h1>
-          <p className="text-xl font-medium text-gray-200 drop-shadow-md">Authentic recipes from every corner of the world</p>
+          <h1 className="text-5xl font-black mb-4 drop-shadow-2xl">{t.heroTitle}</h1>
+          <p className="text-xl font-medium text-gray-200 drop-shadow-md">{t.heroSubtitle}</p>
         </div>
       </div>
 
@@ -97,10 +110,10 @@ function Homepage() {
         
         {/* SIDEBAR FILTER */}
         <div className="w-full md:w-64 bg-white p-6 rounded-2xl shadow-sm h-fit sticky top-24">
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">Filters</h3>
+          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">{t.filters}</h3>
           
           <div className="mb-8">
-            <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">Country</label>
+            <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">{t.country}</label>
             <select 
               className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-orange-400 outline-none"
               value={selectedCountry}
@@ -109,27 +122,27 @@ function Homepage() {
                 setSelectedState("All"); 
               }}
             >
-              <option value="All">All (Mixed)</option>
-              <option value="India">India</option>
-              <option value="Foreign">Foreign</option>
+              <option value="All">{t.allMixed}</option>
+              <option value="India">{t.india}</option>
+              <option value="Foreign">{t.foreign}</option>
             </select>
           </div>
 
           {selectedCountry === "India" && (
             <div>
-              <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">State</label>
+              <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">{t.state}</label>
               <div className="space-y-2">
-                {statesList.map(state => (
+                {statesList.map(({ key, label }) => (
                   <button
-                    key={state}
-                    onClick={() => setSelectedState(state)}
+                    key={key}
+                    onClick={() => setSelectedState(key)}
                     className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
-                      selectedState === state 
+                      selectedState === key
                       ? "bg-orange-500 text-white font-bold shadow-md" 
                       : "text-gray-600 hover:bg-orange-50"
                     }`}
                   >
-                    {state}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -141,16 +154,20 @@ function Homepage() {
         <div className="flex-1">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold text-gray-800">
-              {selectedCountry === "All" ? "All Recipes" : selectedState === "All" ? `${selectedCountry} Recipes` : `${selectedState} Specialities`}
+              {selectedCountry === "All"
+                ? t.allRecipes
+                : selectedState === "All"
+                  ? `${selectedCountry === "India" ? t.india : t.foreign} ${t.recipes}`
+                  : `${statesList.find(s => s.key === selectedState)?.label || selectedState} ${t.specialities}`}
               <span className="ml-3 text-lg font-normal text-gray-400">({filteredRecipes.length})</span>
             </h2>
           </div>
 
           {loading ? (
-             <div className="text-center py-20 text-2xl">Loading Authentic Dishes...</div>
+             <div className="text-center py-20 text-2xl">{t.loading}</div>
           ) : filteredRecipes.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-3xl shadow-inner">
-              <p className="text-gray-400 text-xl">No recipes found. Try searching something else!</p>
+              <p className="text-gray-400 text-xl">{t.noRecipesFound}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -174,7 +191,7 @@ function Homepage() {
 
                 // 🔥 Veg / Non-Veg Logic
                 const isNonVeg = /chicken|mutton|egg|fish|prawn|meat|beef|pork/i.test(safeTitle);
-                const dietBadge = isNonVeg ? "🔴 Non-Veg" : "🟢 Veg";
+                const dietBadge = isNonVeg ? t.nonVeg : t.veg;
 
                 // 🔥 Stricter Image Logic (Fixes the ERR_NAME_NOT_RESOLVED)
                 let finalImage = recipe.image_url || recipe.image || "";
@@ -247,17 +264,19 @@ function Homepage() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Homepage />} />
-          <Route path="/recipe/:id" element={<RecipeDetails />} />
+    <LanguageProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Homepage />} />
+            <Route path="/recipe/:id" element={<RecipeDetails />} />
 
 
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 

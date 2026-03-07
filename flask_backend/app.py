@@ -76,8 +76,16 @@ def ask_ai():
         data = request.json
         question = data.get('question', '')
         context = data.get('context', {}) # Recipe Data
+        language = data.get('language', 'en')
         
         print(f"🗣️ User Question: {question}")
+        
+        # Language instruction
+        lang_instruction = ""
+        if language == 'hi':
+            lang_instruction = "You must respond in Hindi language only."
+        elif language == 'mr':
+            lang_instruction = "You must respond in Marathi language only."
         
         # 1. Ingredients Cleaning
         raw_ing = context.get('ingredients', [])
@@ -117,6 +125,7 @@ def ask_ai():
         1. Keep answer SHORT (max 2 sentences) for voice output.
         2. If user asks for substitute, give kitchen alternative.
         3. If user asks to repeat, read the step exactly.
+        {lang_instruction}
         """
         
         print("⏳ Asking Gemini...")
