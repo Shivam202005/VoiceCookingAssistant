@@ -63,14 +63,15 @@ def seed_database():
                     new_recipe = Recipe(
                         title=r.get('title'),
                         description=r.get('description'),
-                        image_url=r.get('image_url').replace(" ", "+"), # URL me spaces fix karne ke liye
+                        image_url=r.get('image_url', '').replace(" ", "+"), # URL me spaces fix karne ke liye safe banaya
                         ready_in_minutes=int(r.get('ready_in_minutes', 30)),
                         servings=int(r.get('servings', 2)),
                         difficulty=r.get('difficulty', 'Medium'),
                         ingredients=r.get('ingredients', []),
                         steps=r.get('steps', []),
                         country="India",
-                        state=state
+                        state=state,
+                        status="approved" # 🔥 ADMIN FEATURE: Seed ki hui recipes automatically Approve hongi
                     )
                     db.session.add(new_recipe)
                     total_saved += 1

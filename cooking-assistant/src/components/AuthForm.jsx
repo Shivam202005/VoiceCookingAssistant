@@ -1,106 +1,119 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const AuthForm = ({ onClose }) => {
-  const [isSignup, setIsSignup] = useState(true);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+const API_BASE_URL = "/api";
+
+export default function AuthForm({ onClose }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState(''); // ✅ Success message ke liye
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccessMsg('');
-    
-    const endpoint = isSignup ? '/signup' : '/login';
-    
+    setLoading(true);
+
+    const endpoint = isLogin ? '/login' : '/signup';
+    // 🔥 Ab role bhejne ki zarurat nahi, backend khud 'user' set karega
+    const payload = isLogin ? { email, password } : { name, email, password };
+
     try {
-      // ✅ 127.0.0.1 use kar rahe hain consistent rehne ke liye
-      const res = await fetch(`/api${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify(formData),
-        credentials: 'include' // ✅ Important for Session
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        if (isSignup) {
-            // 👇 Signup Success: Ab Login page par bhejo
-            setIsSignup(false); 
-            setSuccessMsg('Account created successfully! Please Login.');
-            setFormData({ ...formData, password: '' }); // Password clear kar do safety ke liye
-        } else {
-            // 👇 Login Success: Home page par bhejo
-            login(data.user); 
-            onClose();
-        }
-      } else {
-        setError(data.error || 'Something went wrong');
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Something went wrong');
       }
+
+      login(data.user); // Login the user
+      onClose(); // Close Modal
     } catch (err) {
-      console.error(err);
-      setError('Server connection failed.');
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 font-bold text-xl">&times;</button>
-
-        <h2 className="text-3xl font-bold mb-2 text-center text-gray-800">
-          {isSignup ? 'Create Account' : 'Welcome Back'}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[999999]">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative animate-fade-in-up">
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-5 text-gray-400 hover:text-red-500 font-bold text-2xl"
+        >
+          ✕
+        </button>
+        
+        <h2 className="text-3xl font-black mb-2 text-gray-800 text-center">
+          {isLogin ? 'Welcome Back! 👋' : 'Join CookBuddy 🍳'}
         </h2>
+        <p className="text-center text-gray-500 mb-6 font-medium">
+          {isLogin ? 'Login to continue your cooking journey' : 'Create an account to save and share recipes'}
+        </p>
 
-        {/* ✅ Success Message Display */}
-        {successMsg && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-4 text-center">
-                {successMsg}
-            </div>
-        )}
-
-        {/* Error Message Display */}
         {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4 text-center">
-                {error}
-            </div>
+          <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-4 text-sm font-bold text-center border border-red-200">
+            {error}
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignup && (
-            <input type="text" placeholder="Full Name" value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-lg" required />
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+              <input
+                type="text" required value={name} onChange={(e) => setName(e.target.value)}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
+                placeholder="Chef Sanjeev Kapoor"
+              />
+            </div>
           )}
           
-          <input type="email" placeholder="Email Address" value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="w-full p-3 border border-gray-300 rounded-lg" required />
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
+            <input
+              type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
+              placeholder="chef@cookbuddy.com"
+            />
+          </div>
 
-          <input type="password" placeholder="Password" value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            className="w-full p-3 border border-gray-300 rounded-lg" required />
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+            <input
+              type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-400 outline-none"
+              placeholder="••••••••"
+            />
+          </div>
 
-          <button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-lg font-bold hover:shadow-lg transition">
-            {isSignup ? 'Sign Up' : 'Login'}
+          <button
+            type="submit" disabled={loading}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100 mt-2"
+          >
+            {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Sign Up')}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button type="button" onClick={() => { setIsSignup(!isSignup); setError(''); setSuccessMsg(''); }}
-            className="text-orange-600 font-bold hover:underline">
-            {isSignup ? 'Login' : 'Sign Up'}
+        <p className="text-center mt-6 text-gray-600 font-medium text-sm">
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <button
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-orange-600 font-bold hover:underline"
+          >
+            {isLogin ? 'Sign Up' : 'Login'}
           </button>
-        </div>
+        </p>
       </div>
     </div>
   );
-};
-
-export default AuthForm;
+}

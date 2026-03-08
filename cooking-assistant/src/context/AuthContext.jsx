@@ -1,60 +1,35 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
-const AuthContext = createContext();
-
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkUser = async () => {
-        const storedUserId = localStorage.getItem('user_id');
-        
-        // "undefined" string check karna zaroori hai kyunki localStorage kabhi kabhi string save kar leta hai
-        if (storedUserId && storedUserId !== 'undefined' && storedUserId !== 'null') {
-            try {
-                // 🔥 URL sirf 127.0.0.1 hona chahiye
-                const res = await fetch(`/api/profile/${storedUserId}`, {
-                    credentials: 'include' 
-                });
-                
-                if (res.ok) {
-                    const userData = await res.json();
-                    setUser(userData);
-                } else {
-                    // Agar session invalid hai to safai karo
-                    localStorage.removeItem('user_id');
-                    setUser(null);
-                }
-            } catch (error) {
-                console.log("Session restore failed:", error);
-            }
-        }
-        setLoading(false);
-    };
-
-    checkUser();
-  }, []);
+  // 🔥 LocalStorage se user nikalenge taaki refresh pe logout na ho
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('cookbuddy_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
 
   const login = (userData) => {
     setUser(userData);
-    localStorage.setItem('user_id', userData.user_id || userData.id);
+    localStorage.setItem('cookbuddy_user', JSON.stringify(userData)); // Save session
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch (e) {
+      console.error("Logout error", e);
+    }
     setUser(null);
-    localStorage.removeItem('user_id');
-    fetch('/api/logout', { 
-        method: 'POST',
-        credentials: 'include'
-    });
+    localStorage.removeItem('cookbuddy_user'); // Clear session
+    window.location.href = '/';
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export const useAuth = () => useContext(AuthContext);

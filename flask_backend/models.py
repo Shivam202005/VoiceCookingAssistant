@@ -4,20 +4,17 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
-# 1. LIKE TABLE
 class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
 
-# 2. COMMENT TABLE
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipe_id = db.Column(db.Integer, db.ForeignKey('recipe.id'), nullable=False)
-    
     user = db.relationship('User', backref='comments')
 
 class User(db.Model, UserMixin):
@@ -25,6 +22,9 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(150), nullable=False)
+    
+    # 🔥 NEW: Admin Role
+    role = db.Column(db.String(20), default='user') # 'admin' or 'user'
 
     def set_password(self, password):
         from flask_bcrypt import generate_password_hash
@@ -36,7 +36,7 @@ class User(db.Model, UserMixin):
 
 class Recipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    spoonacular_id = db.Column(db.Integer, unique=True, nullable=True) # Purana safety feature
+    spoonacular_id = db.Column(db.Integer, unique=True, nullable=True) 
     
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -49,10 +49,11 @@ class Recipe(db.Model):
     steps = db.Column(db.JSON)
     
     author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    
-    # 👇 NAYE COLUMNS REGIONAL FILTER KE LIYE
     country = db.Column(db.String(50), default='India')
     state = db.Column(db.String(50), nullable=True) 
+    
+    # 🔥 NEW: Recipe Status (pending, approved, rejected)
+    status = db.Column(db.String(20), default='approved') 
     
     likes = db.relationship('Like', backref='recipe', lazy='dynamic')
     comments = db.relationship('Comment', backref='recipe', lazy=True)
@@ -72,7 +73,8 @@ class Recipe(db.Model):
             'country': self.country,
             'state': self.state,
             'author_id': self.author_id,
-            'likes_count': self.likes.count(),
+            'status': self.status, # 🔥 Added Status
+            'likes_count': self.likes.count() if hasattr(self.likes, 'count') else len(self.likes),
             'comments': [{
                 'id': c.id,
                 'text': c.text,
