@@ -210,6 +210,31 @@ def admin_delete_recipe(recipe_id):
         return jsonify({'message': 'Recipe deleted successfully!'})
     return jsonify({'error': 'Recipe not found'}), 404
 
+@app.route('/admin/recipe/<int:recipe_id>/update-image', methods=['POST'])
+@login_required
+def admin_update_image(recipe_id):
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    recipe = db.session.get(Recipe, recipe_id)
+    if not recipe:
+        return jsonify({'error': 'Recipe not found'}), 404
+
+    if 'image' in request.files:
+        file = request.files['image']
+        if file.filename != '':
+            filename = secure_filename(file.filename)
+            unique_filename = f"{uuid.uuid4().hex}_{filename}"
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(file_path)
+            
+            image_url = f"http://127.0.0.1:5000/static/uploads/{unique_filename}"
+            recipe.image_url = image_url
+            db.session.commit()
+            return jsonify({'message': 'Image updated successfully!', 'image_url': image_url})
+            
+    return jsonify({'error': 'No image found in request'}), 400
+    
 # --- Like & Comment Routes ---
 @app.route('/recipe/<int:recipe_id>/like', methods=['POST'])
 @login_required

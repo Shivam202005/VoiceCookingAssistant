@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from app import app, db
 from models import Recipe
 from dotenv import load_dotenv
@@ -12,14 +13,14 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-flash-latest')
 
-# States jinki recipes chahiye (5 per state)
+# States jinki recipes chahiye
 STATES = ["Maharashtra", "Punjab", "Uttar Pradesh", "Bihar", "Tamil Nadu", "Rajasthan", "Gujarat"]
 
-def fetch_recipes_for_state(state):
-    print(f"\n🔄 Fetching 5 authentic recipes for {state} using Gemini AI...")
+def fetch_recipes_for_state(state, count):
+    print(f"\n🔄 Fetching {count} authentic recipes for {state} using Gemini AI...")
     
     prompt = f"""
-    You are an expert Indian Chef. Provide exactly 5 authentic and popular recipes from the Indian state of {state}.
+    You are an expert Indian Chef. Provide exactly {count} authentic and popular recipes from the Indian state of {state}.
     Return ONLY a valid JSON array of objects. Do not include any markdown tags like ```json.
     Each object must have exactly these keys:
     - title (string, name of the dish)
@@ -28,15 +29,15 @@ def fetch_recipes_for_state(state):
     - ready_in_minutes (integer, cooking time)
     - servings (integer)
     - difficulty (string, "Easy", "Medium", or "Hard")
-    - ingredients (array of strings, e.g. ["2 cups flour", "1 tsp salt"])
-    - steps (array of strings, e.g. ["Mix ingredients.", "Cook for 10 mins."])
+    - ingredients (array of strings)
+    - steps (array of strings)
     """
     
     try:
         response = model.generate_content(prompt)
         text = response.text.strip()
         
-        # Markdown backticks hatao agar AI ne galti se bhej diye
+        # Markdown backticks hatao
         if text.startswith('```json'):
             text = text[7:]
         if text.startswith('```'):
@@ -54,31 +55,41 @@ def seed_database():
     with app.app_context():
         total_saved = 0
         for state in STATES:
-            recipes = fetch_recipes_for_state(state)
             
-            for r in recipes:
-                # Check if recipe already exists to avoid duplicates
-                existing = Recipe.query.filter_by(title=r.get('title')).first()
-                if not existing:
-                    new_recipe = Recipe(
-                        title=r.get('title'),
-                        description=r.get('description'),
-                        image_url=r.get('image_url', '').replace(" ", "+"), # URL me spaces fix karne ke liye safe banaya
-                        ready_in_minutes=int(r.get('ready_in_minutes', 30)),
-                        servings=int(r.get('servings', 2)),
-                        difficulty=r.get('difficulty', 'Medium'),
-                        ingredients=r.get('ingredients', []),
-                        steps=r.get('steps', []),
-                        country="India",
-                        state=state,
-                        status="approved" # 🔥 ADMIN FEATURE: Seed ki hui recipes automatically Approve hongi
-                    )
-                    db.session.add(new_recipe)
-                    total_saved += 1
+            # 🔥 SMART LOGIC: Maharashtra ke liye 5, baaki sabke liye 3
+            recipe_count = 5 if state == "Maharashtra" else 3
             
-            # Har state ke baad save kar lo
-            db.session.commit()
-            print(f"✅ Saved recipes for {state}")
+            recipes = fetch_recipes_for_state(state, recipe_count)
+            
+            if recipes:
+                for r in recipes:
+                    # Check if recipe already exists
+                    existing = Recipe.query.filter_by(title=r.get('title')).first()
+                    if not existing:
+                        new_recipe = Recipe(
+                            title=r.get('title'),
+                            description=r.get('description'),
+                            image_url=r.get('image_url', '').replace(" ", "+"),
+                            ready_in_minutes=int(r.get('ready_in_minutes', 30)),
+                            servings=int(r.get('servings', 2)),
+                            difficulty=r.get('difficulty', 'Medium'),
+                            ingredients=r.get('ingredients', []),
+                            steps=r.get('steps', []),
+                            country="India",
+                            state=state,
+                            status="approved" # 🔥 ADMIN FEATURE
+                        )
+                        db.session.add(new_recipe)
+                        total_saved += 1
+                
+                db.session.commit()
+                print(f"✅ Saved recipes for {state}")
+            else:
+                print(f"⚠️ Skipped {state} due to error.")
+
+            # 🔥 API Rate limit se bachne ke liye 6 seconds ka aaram
+            print(f"⏳ Waiting 6 seconds before fetching next state...")
+            time.sleep(6)
             
         print(f"\n🎉 Success! Total {total_saved} new Indian recipes added to database!")
 

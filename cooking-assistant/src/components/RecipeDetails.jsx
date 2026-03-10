@@ -7,7 +7,7 @@ const API_BASE_URL = "/api";
 export default function RecipeDetails() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user } = useAuth(); // 🔥 Get Admin User
   
   const isAutoVoiceMode = searchParams.get('voice') === 'true';
 
@@ -15,18 +15,20 @@ export default function RecipeDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Like & Comment States
   const [likes, setLikes] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   
-  // Voice states
   const [isReading, setIsReading] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const [currentText, setCurrentText] = useState("");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   
+  // 🔥 New States for Image Upload
+  const fileInputRef = useRef(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const isReadingRef = useRef(false);
   const stepIndexRef = useRef(0);
 
@@ -53,7 +55,6 @@ export default function RecipeDetails() {
                 console.error("Error checking like status:", err);
             }
         }
-
       } catch (error) {
         setError(error.message);
       } finally {
@@ -65,9 +66,7 @@ export default function RecipeDetails() {
 
   useEffect(() => {
     if (recipe && isAutoVoiceMode && !isReadingRef.current) {
-        setTimeout(() => {
-            startVoiceReading(0);
-        }, 1000);
+        setTimeout(() => startVoiceReading(0), 1000);
     }
   }, [recipe, isAutoVoiceMode]);
 
@@ -83,17 +82,13 @@ export default function RecipeDetails() {
       const googleVoice = voices.find(v => v.name.includes('Google') && v.name.includes('Female')) || voices[0];
       if (googleVoice) utterance.voice = googleVoice;
 
-      utterance.onend = () => {
-        resolve();
-      };
-      
+      utterance.onend = () => resolve();
       speechSynthesis.speak(utterance);
     });
   };
 
   const startVoiceReading = async (startIndex = 0) => {
     if (isReadingRef.current) return;
-    
     setIsReading(true);
     isReadingRef.current = true;
     
@@ -102,14 +97,11 @@ export default function RecipeDetails() {
             await speak(`Starting ${recipe.title}. First, let's check the ingredients.`);
             for (let i = 0; i < recipe.ingredients.length; i++) {
                 if(!isReadingRef.current) break; 
-                const ing = recipe.ingredients[i];
-                const ingText = typeof ing === 'object' ? (ing.original || ing.name) : ing;
+                const ingText = typeof recipe.ingredients[i] === 'object' ? (recipe.ingredients[i].original || recipe.ingredients[i].name) : recipe.ingredients[i];
                 await speak(ingText);
                 await new Promise(r => setTimeout(r, 600)); 
             }
-            if(isReadingRef.current) {
-                await speak("Now, let's start cooking. Here are the instructions.");
-            }
+            if(isReadingRef.current) await speak("Now, let's start cooking. Here are the instructions.");
         } else {
             await speak(`Resuming from step ${startIndex + 1}.`);
         }
@@ -129,7 +121,6 @@ export default function RecipeDetails() {
              isReadingRef.current = false;
              stepIndexRef.current = 0;
         }
-
     } catch(e) { console.log(e); }
   };
 
@@ -145,7 +136,6 @@ export default function RecipeDetails() {
     const recognition = new (window.webkitSpeechRecognition || window.SpeechRecognition)();
     recognition.lang = 'en-US';
     recognition.start();
-
     setCurrentText("🎧 Listening... Ask me anything!");
 
     recognition.onresult = async (event) => {
@@ -157,23 +147,17 @@ export default function RecipeDetails() {
             const res = await fetch(`${API_BASE_URL}/ask-ai`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    context: recipe
-                })
+                body: JSON.stringify({ question: question, context: recipe })
             });
             const data = await res.json();
             setAiThinking(false);
             await speak(data.answer);
-            setTimeout(() => {
-                startVoiceReading(stepIndexRef.current);
-            }, 500);
+            setTimeout(() => startVoiceReading(stepIndexRef.current), 500);
         } catch (err) {
             setAiThinking(false);
             speak("Sorry, connection error.");
         }
     };
-
     recognition.onerror = () => {
         setAiThinking(false);
         setCurrentText("❌ Didn't catch that. Try again.");
@@ -182,10 +166,8 @@ export default function RecipeDetails() {
 
   const handleLike = async () => {
     if (!user) return alert("Please login to like recipes!");
-    
     const originalLikes = likes;
     const originalIsLiked = isLiked;
-    
     setLikes(isLiked ? likes - 1 : likes + 1);
     setIsLiked(!isLiked);
 
@@ -197,7 +179,6 @@ export default function RecipeDetails() {
     } catch (error) {
         setLikes(originalLikes);
         setIsLiked(originalIsLiked);
-        console.error(error);
     }
   };
 
@@ -222,32 +203,53 @@ export default function RecipeDetails() {
     }
   };
 
+  // 🔥 ADMIN: Update Image Function
+  const handleImageUpdate = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    setUploadingImage(true);
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/admin/recipe/${id}/update-image`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            alert("Image updated successfully! 📸");
+            setRecipe({ ...recipe, image_url: data.image_url }); // UI Update without reload
+        } else {
+            alert("Failed to update image.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Server error while uploading.");
+    } finally {
+        setUploadingImage(false);
+    }
+  };
+
   if (loading) return <div className="p-10 text-center text-xl">Loading your delicious recipe...</div>;
   if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
   if (!recipe) return null;
 
-  // 🔥 THE SMART IMAGE FIX FOR RECIPE DETAILS PAGE
   const indianImages = [
     "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=600&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1589302168068-964664d93cb0?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&auto=format&fit=crop"
+    "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=600&auto=format&fit=crop"
   ];
   const foreignImages = [
     "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&auto=format&fit=crop"
+    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop"
   ];
 
   let displayImage = recipe.image_url || recipe.img || "";
   if (!displayImage || !displayImage.startsWith("http") || displayImage.includes("placeholder") || displayImage.includes("f1.jpeg") || displayImage === "undefined") {
-    if (recipe.country === "Foreign") {
-      displayImage = foreignImages[(recipe.id || 0) % foreignImages.length];
-    } else {
-      displayImage = indianImages[(recipe.id || 0) % indianImages.length];
-    }
+    displayImage = recipe.country === "Foreign" ? foreignImages[(recipe.id || 0) % foreignImages.length] : indianImages[(recipe.id || 0) % indianImages.length];
   }
 
   return (
@@ -281,8 +283,25 @@ export default function RecipeDetails() {
 
         {/* Recipe Content */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* 🔥 Yahan displayImage use kar rahe hain */}
-            <img src={displayImage} alt={recipe.title} className="w-full h-72 object-cover"/>
+            {/* 🔥 IMAGE SECTION WITH ADMIN EDIT BUTTON */}
+            <div className="relative w-full h-80 bg-black group">
+                <img src={displayImage} alt={recipe.title} className="w-full h-full object-cover opacity-90 transition-opacity group-hover:opacity-100"/>
+                
+                {/* Admin Image Editor */}
+                {user?.role === 'admin' && (
+                    <div className="absolute top-4 right-4 z-10">
+                        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpdate} className="hidden" />
+                        <button 
+                            onClick={() => fileInputRef.current.click()}
+                            disabled={uploadingImage}
+                            className="bg-black/60 hover:bg-orange-500 text-white px-4 py-2 rounded-full font-bold shadow-xl backdrop-blur-md border border-white/20 transition-all flex items-center gap-2"
+                        >
+                            {uploadingImage ? '⏳ Uploading...' : '✏️ Change Image'}
+                        </button>
+                    </div>
+                )}
+            </div>
+
             <div className="p-8">
                 <div className="flex justify-between items-start">
                     <h1 className="text-4xl font-extrabold mb-6 text-gray-800 flex-1">{recipe.title}</h1>
@@ -292,7 +311,6 @@ export default function RecipeDetails() {
                     </div>
                 </div>
                 
-                {/* Ingredients Grid */}
                 <div className="mb-8 p-6 bg-yellow-50 rounded-xl border border-yellow-100">
                     <h3 className="text-2xl font-bold mb-4 text-yellow-800">🥕 Ingredients</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -305,7 +323,6 @@ export default function RecipeDetails() {
                     </div>
                 </div>
 
-                {/* Steps List */}
                 <div>
                     <h3 className="text-2xl font-bold mb-6 text-gray-800">👨‍🍳 Instructions</h3>
                     <div className="space-y-6">
@@ -328,9 +345,7 @@ export default function RecipeDetails() {
                 <button 
                     onClick={handleLike}
                     className={`flex items-center gap-2 px-8 py-3 rounded-full font-bold text-lg transition-all shadow-sm ${
-                        isLiked 
-                        ? 'bg-red-500 text-white shadow-red-200 transform scale-105' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        isLiked ? 'bg-red-500 text-white shadow-red-200 transform scale-105' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
                     {isLiked ? '❤️ Liked' : '🤍 Like Recipe'} 
@@ -386,7 +401,6 @@ export default function RecipeDetails() {
                 </div>
             )}
         </div>
-
       </div>
     </div>
   );
