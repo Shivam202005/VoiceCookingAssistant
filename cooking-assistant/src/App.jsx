@@ -4,7 +4,7 @@ import Navbar from "./components/Navbar";
 import RecipeCard from "./components/RecipeCard";
 import VoiceModal from "./components/VoiceModal";
 import RecipeDetails from "./components/RecipeDetails";
-
+import { LanguageProvider, useLanguage } from './context/LanguageContext'; // 🔥 Import updated
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthForm from './components/AuthForm';
@@ -15,6 +15,8 @@ const API_BASE_URL = "/api";
 
 function Homepage() {
   const { user } = useAuth();
+  const { t } = useLanguage(); // 🔥 Translation hook lagaya!
+
   const [showAuth, setShowAuth] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,10 +99,10 @@ function Homepage() {
         
         {/* SIDEBAR FILTER */}
         <div className="w-full md:w-64 bg-white p-6 rounded-2xl shadow-sm h-fit sticky top-24">
-          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">Filters</h3>
+          <h3 className="text-xl font-bold mb-6 flex items-center gap-2">{t('filters')}</h3>
           
           <div className="mb-8">
-            <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">Country</label>
+            <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">{t('country')}</label>
             <select 
               className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-orange-400 outline-none"
               value={selectedCountry}
@@ -117,7 +119,7 @@ function Homepage() {
 
           {selectedCountry === "India" && (
             <div>
-              <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">State</label>
+              <label className="block text-sm font-semibold text-gray-500 uppercase mb-2">{t('state')}</label>
               <div className="space-y-2">
                 {statesList.map(state => (
                   <button
@@ -141,7 +143,7 @@ function Homepage() {
         <div className="flex-1">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-3xl font-bold text-gray-800">
-              {selectedCountry === "All" ? "All Recipes" : selectedState === "All" ? `${selectedCountry} Recipes` : `${selectedState} Specialities`}
+              {selectedCountry === "All" ? t('allRecipes') : selectedState === "All" ? `${selectedCountry} Recipes` : `${selectedState} Specialities`}
               <span className="ml-3 text-lg font-normal text-gray-400">({filteredRecipes.length})</span>
             </h2>
           </div>
@@ -150,7 +152,7 @@ function Homepage() {
              <div className="text-center py-20 text-2xl">Loading Authentic Dishes...</div>
           ) : filteredRecipes.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-3xl shadow-inner">
-              <p className="text-gray-400 text-xl">No recipes found. Try searching something else!</p>
+              <p className="text-gray-400 text-xl">{t('noRecipesFound')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -176,7 +178,7 @@ function Homepage() {
                 const isNonVeg = /chicken|mutton|egg|fish|prawn|meat|beef|pork/i.test(safeTitle);
                 const dietBadge = isNonVeg ? "🔴 Non-Veg" : "🟢 Veg";
 
-                // 🔥 Stricter Image Logic (Fixes the ERR_NAME_NOT_RESOLVED)
+                // 🔥 Stricter Image Logic
                 let finalImage = recipe.image_url || recipe.image || "";
                 if (!finalImage || !finalImage.startsWith("http") || finalImage.includes("placeholder") || finalImage.includes("f1.jpeg") || finalImage === "undefined") {
                   if (recipe.country === "Foreign") {
@@ -245,18 +247,19 @@ function Homepage() {
   );
 }
 
+// 🔥 FIXED APP STRUCTURE (No duplicate routers!)
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Homepage />} />
-          <Route path="/recipe/:id" element={<RecipeDetails />} />
-
-
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </Router>
+      <LanguageProvider>  {/* Language Provider yahan aayega */}
+        <Router>
+          <Routes>
+            <Route path="/" element={<Homepage />} />
+            <Route path="/recipe/:id" element={<RecipeDetails />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </Router>
+      </LanguageProvider>
     </AuthProvider>
   );
 }
