@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 
-// ⚠️ Asli Imports (Make sure these paths are correct for your project)
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -38,18 +37,15 @@ export default function RecipeDetails() {
   const isReadingRef = useRef(false);
   const stepIndexRef = useRef(0);
 
-  // Jab page load ho, purani awaaz band kar do
   useEffect(() => {
     window.speechSynthesis.cancel();
   }, []);
 
-  // Browser voices load karne ke liye
   useEffect(() => {
     window.speechSynthesis.getVoices();
   }, []);
 
-  // 1. Fetch Original Recipe
-  // 🔥 FIX: Added user?.id in dependencies to completely stop the infinite loop!
+  
   useEffect(() => {
     let isMounted = true;
     async function fetchRecipe() {
@@ -85,9 +81,8 @@ export default function RecipeDetails() {
     if (id) fetchRecipe();
     
     return () => { isMounted = false; };
-  }, [id, user?.id]); // <-- Yahan 'user' ki jagah 'user?.id' kiya taaki infinite loop na bane
+  }, [id, user?.id]); 
 
-  // 2. Translation Logic
   useEffect(() => {
     if (!originalRecipe) return;
     

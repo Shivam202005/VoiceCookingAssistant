@@ -32,7 +32,6 @@ CORS(app, resources={r"/*": {
     "origins": ["http://localhost:5173", "http://127.0.0.1:5173"]
 }}, supports_credentials=True)
 
-# 🔥 YAHAN THI GALTI: Ab ise 'gemini-flash-latest' kar diya hai jo tumhare system me chalta hai!
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 model = None
 if GEMINI_API_KEY:
@@ -56,10 +55,8 @@ def unauthorized():
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# 🔥 Cache to save API Quota (Prevents 429 Errors)
 translation_cache = {}
 
-# --- PUBLIC ROUTES ---
 @app.route('/recipes')
 def recipes():
     try:
@@ -87,7 +84,6 @@ def get_recipe(recipe_id):
         return jsonify(recipe.to_dict())
     return jsonify({'error': 'Recipe not found'}), 404
 
-# --- TRANSLATION ROUTE ---
 @app.route('/translate-recipe', methods=['POST'])
 def translate_recipe():
     data = request.json
